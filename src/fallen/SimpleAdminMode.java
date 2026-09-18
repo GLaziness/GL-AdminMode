@@ -167,28 +167,7 @@ public class SimpleAdminMode extends Mod {
 
     private void setupSettings() {
         ui.settings.addCategory(Core.bundle.get("sam.settings.title"), Icon.admin, table -> {
-            table.left().row();
-            table.check(Core.bundle.get("sam.settings.stats"), Core.settings.getBool("sam-show-stats", false), val -> {
-                Core.settings.put("sam-show-stats", val);
-            }).left().row();
-
-            table.check(Core.bundle.get("sam.settings.vanish"), Core.settings.getBool("sam-vanish", false), val -> {
-                Core.settings.put("sam-vanish", val);
-            }).left().row();
-
-            table.check(Core.bundle.get("sam.settings.freecam"), Core.settings.getBool("sam-freecam", false), val -> {
-                Core.settings.put("sam-freecam", val);
-            }).left().row();
-
-            addSlider(table, "sam.settings.btnSize", "sam-btn-size", 30, 80, 40);
-            addSlider(table, "sam.settings.hudY", "sam-hud-offset", -50, 300, 4);
-
-            table.button(Core.bundle.get("sam.settings.resetSettings"), () -> {
-                Core.settings.put("sam-show-stats", false);
-                Core.settings.put("sam-btn-size", 40);
-                Core.settings.put("sam-hud-offset", 4);
-                ui.showInfoFade(Core.bundle.get("sam.settings.resetDone"));
-            }).margin(10).width(240f).padTop(20f);
+            table.button("@sam.settings.open", Icon.settings, () -> new SimpleAdminSettings().show()).size(320f, 60f).pad(10f).row();
         });
     }
 

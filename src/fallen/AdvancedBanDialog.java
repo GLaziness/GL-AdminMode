@@ -13,11 +13,13 @@ import mindustry.ui.dialogs.BaseDialog;
 import static mindustry.Vars.ui;
 
 public class AdvancedBanDialog extends BaseDialog {
+    private final String name;
     private String currentScope = Core.settings.getBool("sam-default-select-all", false) ? "all" : "here";
 
     public AdvancedBanDialog(Player player, String uuid) {
         super(Core.bundle.format("sam.ban.title", Strings.stripColors(player.name)));
         addCloseButton();
+        name = player.name;
 
         cont.table(top -> {
             top.add("[lightgray]UUID: [accent]" + uuid).padRight(20);
@@ -164,6 +166,11 @@ public class AdvancedBanDialog extends BaseDialog {
         String cmd = Strings.format("/ban @ @ @ @", uuid, time, scope, reason);
         Call.sendChatMessage(cmd);
         Vars.player.sendMessage("[gray][Sent]: [white]" + cmd);
+        if(BanMessages.enabled()){
+            // GL: a funny announcement in the chat, a bit later so the server does not count it as spam
+            String text = BanMessages.random(name, time);
+            Time.runTask(90f, () -> Call.sendChatMessage(text));
+        }
         hide();
     }
 }
