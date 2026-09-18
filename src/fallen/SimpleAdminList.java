@@ -40,25 +40,15 @@ public class SimpleAdminList{
             cont.name = "playerlist";
             cont.visible(() -> visible);
             cont.touchable = Touchable.enabled;
-            cont.clicked(()->{
-                if(Core.settings.getBool("sam-close-listoutside", false)) {
-                    this.toggle();
-                }
+            cont.clicked(() -> {
+                if(Core.settings.getBool("sam-close-listoutside", false)) this.toggle();
             });
             cont.update(() -> {
                 if(!(net.active() && state.isGame())){
                     visible = false;
                     return;
                 }
-
                 if(visible && timer.get(180)){
-//                    if(Core.app.isDesktop()){
-//                        if(Core.input.keyDown(KeyCode.mouseLeft) ||
-//                                Core.input.keyDown(KeyCode.mouseRight) ||
-//                                isMouseOverUI()){
-//                            return;
-//                        }
-//                    }
                     rebuild();
                     content.pack();
                     content.act(Core.graphics.getDeltaTime());
@@ -66,230 +56,179 @@ public class SimpleAdminList{
                 }
             });
 
-            mainTable = cont.table(Tex.buttonTrans, pane -> {
+            // GL: laid out like the GL Client windows: accent title and line, dark cards, compact icon buttons
+            mainTable = cont.table(Styles.black8, pane -> {
                 pane.touchable = Touchable.enabled;
-                pane.addListener(new InputListener() {
+                pane.addListener(new InputListener(){
                     @Override
-                    public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button) {
+                    public boolean touchDown(InputEvent event, float x, float y, int pointer, KeyCode button){
                         event.stop();
                         return true;
                     }
                 });
+                pane.margin(10f);
 
-                pane.label(() -> Core.bundle.format(playerHistory.size == 1 ? "players.single" : "players", playerHistory.size));
-                pane.row();
+                pane.table(head -> {
+                    head.left();
+                    head.image(Icon.players).color(Pal.accent).size(24f).padRight(8f);
+                    head.label(() -> Core.bundle.format("sam.list.title", Groups.player.size(), playerHistory.size)).color(Pal.accent).growX().left();
+                    head.button(Icon.settings, Styles.clearNonei, () -> new SimpleAdminSettings().show()).size(36f).tooltip(Core.bundle.get("sam.hud.settings"));
+                    head.button(Icon.cancel, Styles.clearNonei, this::toggle).size(36f).tooltip(Core.bundle.get("close"));
+                }).growX().row();
+                pane.image().color(Pal.accent).height(3f).growX().padTop(4f).padBottom(6f).row();
 
-                search = pane.field(null, text -> rebuild()).grow().pad(8).name("search").maxTextLength(maxNameLength).get();
-                search.setMessageText(Core.bundle.get("players.search"));
+                pane.table(s -> {
+                    s.image(Icon.zoom).color(Color.lightGray).size(20f).padRight(6f);
+                    search = s.field(null, text -> rebuild()).growX().name("search").maxTextLength(maxNameLength).get();
+                    search.setMessageText(Core.bundle.get("players.search"));
+                }).growX().padBottom(6f).row();
 
-                pane.row();
-                pane.pane(content).grow().scrollX(false);
-                pane.row();
+                pane.pane(content).grow().scrollX(false).row();
 
-                pane.table(menu -> {
-                    menu.defaults().growX().height(50f).fillY();
-                    menu.name = "menu";
-                    // 3. ПОЛЕ РУЧНОГО ВВОДА
-                    menu.table(manual -> {
-                        manual.background(Styles.black3).margin(4);
-
-                        // Поле ввода
-                        TextField field = manual.field("", text -> manualUuid = text)
-                                .growX()
-                                .height(45)
-                                .get();
-                        field.setMessageText(Core.bundle.get("sam.list.manualUUID"));
-
-                        // Кнопка открытия меню бана для этого UUID
-                        manual.button(Icon.waves, Styles.clearNonei, () -> {
-                            Call.sendChatMessage("/freeze " + manualUuid);
-                        }).size(45).padLeft(8).tooltip(Core.bundle.get("sam.list.freeze"));
-
-                        // Кнопка открытия меню бана для этого UUID
-                        manual.button(Icon.hammer, Styles.clearNonei, () -> {
-                            if (manualUuid.isEmpty()) {
-                                ui.showInfoFade(Core.bundle.get("sam.info.smallUUID"));
-                                return;
-                            }
-
-                            // Создаем фейкового игрока для заголовка
-                            Player fake = Player.create();
-                            fake.name = "[gray]Manual Entry[]";
-
-                            new AdvancedBanDialog(fake, manualUuid).show();
-                        }).size(45).padLeft(8).tooltip(Core.bundle.get("sam.list.ban"));
-
-                    }).padTop(10).row();
-                    menu.table(buttons -> {
-                        buttons.defaults().height(50f).fillY();
-                        buttons.button("@close", this::toggle).growX();
-                        buttons.button(Icon.settings, Styles.defaulti, () -> {
-                            new SimpleAdminSettings().show();
-                        }).width(50f).padLeft(4f);
-                    }).growX().padLeft(4f);
-
-                }).margin(0f).pad(10f).growX();
-
-            }).touchable(Touchable.enabled).margin(14f).minWidth(panelWidth).get();
+                // manual UUID
+                pane.table(Styles.grayPanel, manual -> {
+                    manual.margin(4f);
+                    TextField field = manual.field("", text -> manualUuid = text).growX().height(40f).get();
+                    field.setMessageText(Core.bundle.get("sam.list.manualUUID"));
+                    manual.button(Icon.waves, Styles.clearNonei, () -> {
+                        if(manualUuid.isEmpty()){
+                            ui.showInfoFade(Core.bundle.get("sam.info.smallUUID"));
+                            return;
+                        }
+                        Call.sendChatMessage("/freeze " + manualUuid);
+                    }).size(40f).padLeft(4f).tooltip(Core.bundle.get("sam.list.freeze")).get().getImage().setColor(Color.sky);
+                    manual.button(Icon.hammer, Styles.clearNonei, () -> {
+                        if(manualUuid.isEmpty()){
+                            ui.showInfoFade(Core.bundle.get("sam.info.smallUUID"));
+                            return;
+                        }
+                        Player fake = Player.create();
+                        fake.name = "[gray]Manual Entry[]";
+                        new AdvancedBanDialog(fake, manualUuid).show();
+                    }).size(40f).tooltip(Core.bundle.get("sam.list.ban")).get().getImage().setColor(Color.scarlet);
+                }).growX().padTop(8f);
+            }).touchable(Touchable.enabled).minWidth(panelWidth).get();
         });
 
         rebuild();
     }
 
-//    private boolean isMouseOverUI(){
-//        // Проверяем, не наведена ли мышь на наш контент
-//        var hit = Core.scene.hit(Core.input.mouseX(), Core.input.mouseY(), true);
-//        return hit != null && (content.isDescendantOf(hit) || content == hit);
-//    }
+    private static boolean hasUuid(PlayerData user){
+        return !user.uuid.equals("Loading...") && !user.uuid.equals("none");
+    }
 
     public void rebuild(){
-
-        float h = 50f;
         this.button_size = Core.settings.getInt("sam-btn-size", 40);
         this.panelWidth = Core.settings.getInt("sam-list-w", 400);
-        if (mainTable != null) {
+        if(mainTable != null){
             mainTable.setWidth(panelWidth);
             mainTable.invalidate();
         }
-        float buttonWidth = panelWidth - 60f;
-
-        boolean found = false;
-
+        float cardWidth = panelWidth - 30f;
+        float bs = Math.max(button_size * 0.8f, 26f);
 
         Seq<PlayerData> filtered = Seq.with(playerHistory.values());
         if(search.getText().length() > 0){
             String query = search.getText().toLowerCase();
-            filtered = filtered.copy().retainAll(d ->
-                    Strings.stripColors(d.name.toLowerCase()).contains(query)
-            );
+            filtered.retainAll(d -> Strings.stripColors(d.name).toLowerCase().contains(query));
         }
         filtered.sort((a, b) -> {
-            // Онлайн выше оффлайна
-            if (a.online != b.online) {
-                return a.online ? -1 : 1;
-            }
-            // Админы выше
-            boolean aAdmin = a.player != null && a.player.admin;
-            boolean bAdmin = b.player != null && b.player.admin;
-            if (aAdmin != bAdmin) {
-                return aAdmin ? -1 : 1;
-            }
-            // По имени
+            if(a.online != b.online) return a.online ? -1 : 1; // online first
+            boolean aAdmin = a.player != null && a.player.admin, bAdmin = b.player != null && b.player.admin;
+            if(aAdmin != bAdmin) return aAdmin ? -1 : 1;       // admins next
             return Strings.stripColors(a.name).compareToIgnoreCase(Strings.stripColors(b.name));
         });
 
         content.clear();
-        boolean lastWasOnline = true; // Начинаем с true, чтобы не показывать разделитель в начале
+        content.top();
+        boolean lastWasOnline = true;
 
-        //for(var user : players){
-        //for (PlayerData user : SimpleAdminMode.playerHistory.values()) {
-        for (PlayerData user : filtered) {
-            found = true;
-
-            // Разделитель между онлайн/оффлайн
-            if (lastWasOnline && !user.online) {
-                content.add().height(8).row();
-                content.add(Core.bundle.get("sam.list.offline")).color(Pal.redLight).center().row();
-                content.add().height(4).row();
+        for(PlayerData user : filtered){
+            if(lastWasOnline && !user.online){
+                content.table(d -> {
+                    d.image().color(Pal.redLight).height(2f).growX();
+                    d.add(Core.bundle.get("sam.list.offline")).color(Pal.redLight).padLeft(8f).padRight(8f);
+                    d.image().color(Pal.redLight).height(2f).growX();
+                }).width(cardWidth).padTop(6f).padBottom(4f).row();
             }
             lastWasOnline = user.online;
 
-            // ОСНОВНАЯ ТАБЛИЦА ИГРОКА
-            Table button = new Table();
-            button.left();
-            button.margin(4).marginBottom(6);
-            button.background(Tex.underline);
-            button.touchable = Touchable.enabled;
-            button.clicked(() -> {});
-            // === СТРОКА 1: Имя + Кнопка меню ===
-            button.table(nameTable -> {
-                nameTable.left().defaults().pad(2);
+            Table card = new Table(Styles.grayPanel);
+            card.left().margin(6f);
+            card.touchable = Touchable.enabled;
+            card.clicked(() -> {});
 
-                // Иконка юнита и переход к нему
-                if (user.player != null) {
-                    Unit u = user.player.unit();
-                    if (u != null && u.type != null) {  // Игрок онлайн и имеет юнит
-                        nameTable.button(Styles.cleart.disabled, () -> {
-                            control.input.spectate(user.player.unit());
-                        }).width(50f).height(35f).get().image(user.player.unit().icon()).size(20f).scaling(Scaling.fit);
-                    } else {  // Игрок оффлайн, но объект Player сохранился
-                        nameTable.button(Icon.cancelSmall, Styles.cleari, () -> {
-                            Core.camera.position.set(user.player.x, user.player.y);
-                        }).width(50f).height(35f);
-                    }
-                } else {  // Объекта Player нет
-                    nameTable.button(Icon.cancelSmall, Styles.cleari, () -> {
-                            }).width(50f).height(35f);
-                }
-                // Имя игрока (занимает всё доступное место)
-                nameTable.add(user.name).left().growX().wrap();
+            // unit icon: spectate the player
+            Unit unit = user.player == null ? null : user.player.unit();
+            if(unit != null && unit.type != null){
+                card.button(b -> b.image(unit.icon()).size(26f).scaling(Scaling.fit), Styles.cleart, () -> control.input.spectate(user.player.unit()))
+                    .size(40f).padRight(6f);
+            }else{
+                card.button(Icon.cancelSmall, Styles.clearNonei, () -> {
+                    if(user.player != null) Core.camera.position.set(user.player.x, user.player.y);
+                }).size(40f).padRight(6f).get().getImage().setColor(Color.gray);
+            }
 
-                nameTable.button(Icon.info, Styles.cleari, () -> {
-                    showInfoPanel(user);
-                    if(Core.settings.getBool("sam-close-list")){
-                        this.toggle();
-                    }
-                }).size(button_size).margin(2f).tooltip(Core.bundle.get("sam.list.showSaveData"));
+            // name and a short line with UUID, language and block stats
+            card.table(text -> {
+                text.left().defaults().left();
+                text.table(n -> {
+                    n.left();
+                    if(user.player != null && user.player.admin) n.image(Icon.adminSmall).color(Pal.accent).size(16f).padRight(4f);
+                    Label name = n.add(user.name).minWidth(0f).growX().left().get();
+                    name.setEllipsis(true);
+                }).growX().row();
 
-                // Кнопка меню (только для онлайн)
-                if (user.online) {
-                    nameTable.button(Icon.menu, Styles.cleari, () -> {
-                        showPlayerMenu(user);
-                    }).size(button_size).margin(2f).tooltip(Core.bundle.get("sam.list.admActions"));
-                }
-            }).growX().row();
-
-            // === СТРОКА 2: Статус + UUID + Кнопки ===
-            button.table(infoTable -> {
-                infoTable.left().defaults().height(28).pad(1);
-                // UUID
                 String uuidText = user.uuid.equals("admin?") ? "[green]admin" :
-                        user.uuid.equals("Loading...") ? "[gray]waiting..." :
-                                user.uuid.equals("none") ? "[gray]none" :
-                                        user.uuid;
-                infoTable.add("[accent]UUID: [white]" + uuidText).growX().left();
-                if(Core.settings.getBool("sam-fastlang", false)){infoTable.add("[accent] L: [white]" + user.locale).right();}
+                    user.uuid.equals("Loading...") ? "[gray]..." :
+                    user.uuid.equals("none") ? "[gray]none" : "[lightgray]" + user.uuid;
+                text.table(line -> {
+                    line.left();
+                    Label uuid = line.add("[gray]UUID []" + uuidText + (Core.settings.getBool("sam-fastlang", false) ? "  [gray]" + user.locale : ""))
+                        .minWidth(0f).get();
+                    uuid.setFontScale(0.8f);
+                    uuid.setEllipsis(true);
+                    if(Core.settings.getBool("sam-show-stats", false)){
+                        line.button(st -> {
+                            Label l = st.add(new Label(() -> "[green]+" + user.builds + " [red]-" + user.breaks + " [sky]~" + user.configs)).get();
+                            l.setFontScale(0.8f);
+                        }, Styles.cleart, () -> HistoryRender.setTarget(user.name)).height(22f).padLeft(8f);
+                    }
+                }).growX();
+            }).minWidth(0f).growX();
 
-                if(Core.settings.getBool("sam-show-stats", false)) {
-                    infoTable.button(st -> {
-                        st.defaults().padLeft(2).padRight(2).fontScale(0.8f);
-                        st.add(new Label(() -> "[green]" + user.builds + "[]| [red]" + user.breaks + "[]| [sky]" + user.configs)).minWidth(60);
-                    }, Styles.flatBordert, () -> {
-                        HistoryRender.setTarget(user.name);
-                    }).right().height(24).padRight(4);
+            // actions
+            card.table(a -> {
+                a.right().defaults().size(bs);
+                a.button(Icon.info, Styles.clearNonei, () -> {
+                    showInfoPanel(user);
+                    if(Core.settings.getBool("sam-close-list")) this.toggle();
+                }).tooltip(Core.bundle.get("sam.list.showSaveData"));
+                if(user.online){
+                    a.button(Icon.menu, Styles.clearNonei, () -> showPlayerMenu(user)).tooltip(Core.bundle.get("sam.list.admActions"));
+                    a.button(Icon.waves, Styles.clearNonei, () -> {
+                        if(hasUuid(user)) Call.sendChatMessage("/freeze " + user.uuid);
+                        else ui.showInfoFade(Core.bundle.get("sam.list.noUuid"));
+                    }).tooltip(Core.bundle.get("sam.list.freeze")).get().getImage().setColor(Color.sky);
                 }
-                // Кнопки действий
-                if (user.online) {
-                    infoTable.button(Icon.wavesSmall, Styles.cleari, () -> {
-                        if (!user.uuid.equals("Loading...") && !user.uuid.equals("none")) {
-                            Call.sendChatMessage("/freeze " + user.uuid);
-                        } else {
-                            ui.showInfoFade("[red]UUID ещё не получен");
-                        }
-                    }).size(button_size).margin(2f).tooltip(Core.bundle.get("sam.list.freeze"));
-                }
-
-                infoTable.button(Icon.hammer, Styles.cleari, () -> {
-                    if (!user.uuid.equals("Loading...") && !user.uuid.equals("none")) {
+                a.button(Icon.hammer, Styles.clearNonei, () -> {
+                    if(hasUuid(user)){
                         Player p = Groups.player.getByID(user.id);
-                        if (p == null) p = Player.create();
+                        if(p == null) p = Player.create();
                         p.name = user.name;
                         new AdvancedBanDialog(p, user.uuid).show();
-                    } else {
-                        ui.showInfoFade("[red]UUID ещё не получен");
+                    }else{
+                        ui.showInfoFade(Core.bundle.get("sam.list.noUuid"));
                     }
-                }).size(button_size).margin(2f).tooltip(Core.bundle.get("sam.list.ban"));
-            }).growX();
+                }).tooltip(Core.bundle.get("sam.list.ban")).get().getImage().setColor(Color.scarlet);
+            }).padLeft(4f);
 
-            content.add(button).width(buttonWidth).padBottom(4);
-            content.row();
-        }
-        if(!found){
-            content.add(Core.bundle.format("players.notfound")).padBottom(6).width(350f).maxHeight(h + 14);
+            content.add(card).width(cardWidth).padBottom(4f).row();
         }
 
-        content.marginBottom(5);
-
+        if(filtered.isEmpty()){
+            content.add(Core.bundle.format("players.notfound")).color(Color.lightGray).pad(10f);
+        }
     }
 
     private void showPlayerMenu(PlayerData user) {
