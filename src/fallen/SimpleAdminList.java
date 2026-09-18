@@ -182,30 +182,29 @@ public class SimpleAdminList{
                 String uuidText = user.uuid.equals("admin?") ? "[green]admin" :
                     user.uuid.equals("Loading...") ? "[gray]..." :
                     user.uuid.equals("none") ? "[gray]none" : "[lightgray]" + user.uuid;
-                text.table(line -> {
-                    line.left();
-                    Label uuid = line.add("[gray]UUID []" + uuidText + (Core.settings.getBool("sam-fastlang", false) ? "  [gray]" + user.locale : ""))
-                        .minWidth(0f).get();
-                    uuid.setFontScale(0.8f);
-                    uuid.setEllipsis(true);
-                    if(Core.settings.getBool("sam-show-stats", false)){
-                        line.button(st -> {
-                            Label l = st.add(new Label(() -> "[green]+" + user.builds + " [red]-" + user.breaks + " [sky]~" + user.configs)).get();
-                            l.setFontScale(0.8f);
-                        }, Styles.cleart, () -> HistoryRender.setTarget(user.name)).height(22f).padLeft(8f);
-                    }
-                }).growX();
+                // full UUID on its own line, block stats under it
+                Label uuid = text.add("[gray]UUID []" + uuidText + (Core.settings.getBool("sam-fastlang", false) ? "  [gray]" + user.locale : "")).left().get();
+                uuid.setFontScale(0.8f);
+                text.row();
+                if(Core.settings.getBool("sam-show-stats", false)){
+                    text.button(st -> {
+                        st.left();
+                        Label l = st.add(new Label(() -> "[green]+" + user.builds + " [red]-" + user.breaks + " [sky]~" + user.configs)).get();
+                        l.setFontScale(0.8f);
+                    }, Styles.cleart, () -> HistoryRender.setTarget(user.name)).height(20f).left();
+                }
             }).minWidth(0f).growX();
 
-            // actions
+            // actions: 2 x 2 grid (info, menu / freeze, ban), so the name and UUID get the width
             card.table(a -> {
-                a.right().defaults().size(bs);
+                a.right().defaults().size(bs).pad(1f);
                 a.button(Icon.info, Styles.clearNonei, () -> {
                     showInfoPanel(user);
                     if(Core.settings.getBool("sam-close-list")) this.toggle();
                 }).tooltip(Core.bundle.get("sam.list.showSaveData"));
                 if(user.online){
                     a.button(Icon.menu, Styles.clearNonei, () -> showPlayerMenu(user)).tooltip(Core.bundle.get("sam.list.admActions"));
+                    a.row();
                     a.button(Icon.waves, Styles.clearNonei, () -> {
                         if(hasUuid(user)) Call.sendChatMessage("/freeze " + user.uuid);
                         else ui.showInfoFade(Core.bundle.get("sam.list.noUuid"));
@@ -221,7 +220,7 @@ public class SimpleAdminList{
                         ui.showInfoFade(Core.bundle.get("sam.list.noUuid"));
                     }
                 }).tooltip(Core.bundle.get("sam.list.ban")).get().getImage().setColor(Color.scarlet);
-            }).padLeft(4f);
+            }).padLeft(6f);
 
             content.add(card).width(cardWidth).padBottom(4f).row();
         }
