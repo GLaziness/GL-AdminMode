@@ -51,6 +51,7 @@ public class SimpleAdminSettings extends BaseDialog{
             check(t, "@sam.settings.vanish", "sam-vanish", false);
             check(t, "@sam.settings.fastlang", "sam-fastlang", false);
             check(t, "@sam.settings.freecam", "sam-freecam", false);
+            check(t, "@sam.settings.updateCheck", "sam-update-check", true);
         });
 
         section(Icon.chat, "@sam.settings.banAnnounce", t -> {

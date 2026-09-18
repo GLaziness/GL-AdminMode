@@ -33,6 +33,7 @@ public class SimpleAdminMode extends Mod {
             AntiAttemPatcher.load();
             adminList.build(Core.scene.root);
             setupSettings();
+            Time.runTask(180f, ModUpdater::check); // GL: offer updates from the GitHub releases
             setupTraceOverride(); // Первый запуск
 
             // === ПОДМЕНА INPUT HANDLER ДЛЯ МОБИЛЬНЫХ ===
