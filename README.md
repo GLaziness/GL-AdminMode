@@ -1,50 +1,52 @@
-# Simple Admin Mode
-Mod for easier tracking and banning
+# GL Admin Mode
 
-# Main features
-Automatic UUID collection.
+Мод для админов Mindustry: следить за игроками, быстро банить гриферов и видеть, кто что строит и ломает.
+Это ребрендинг и доработка [SimpleAdminMode](https://github.com/AbyssOfStarlight/SimpleAdminMode) (автор FD) от GLaziness. Мод хорошо работает вместе с [GL Client](https://github.com/GLaziness/GL-Client), но нужен не только ему.
 
-Fast Ban Dialog.
+## Возможности
 
-Real-time statistics: Construction, Demolition, Configuration.
+- **Панель на экране.** Компактная панель встаёт на левом краю, сразу под уже открытыми панелями: волнами, боковой панелью GL Client или панелями других модов. Если они меняют размер, панель переезжает за ними.
+  - Кнопка списка игроков; если её удерживать, в чат уходит `/history`.
+  - Счётчик игроков онлайн.
+  - Кнопки истории блоков и настроек.
+  - На телефоне: кнопка свободной камеры.
+- **UUID собираются сами.** Мод тихо запрашивает трассировку игроков и запоминает UUID, IP, историю ников и IP, число входов и киков.
+- **Быстрый бан.** Окно бана со списком правил и своей причиной; можно выбрать, на каком сервере банить, `here` или `all`.
+- **Статистика в реальном времени:** сколько игрок построил, сломал и перенастроил.
+- **Антигрифер.**
+  - Оповещения о подозрительных игроках.
+  - Автофриз тех, кто в основном ломает.
+  - Предупреждения о реакторах, мусоросжигателях и плавильнях у ядра.
+  - Автобан за процессоры-аттемы.
+- **Vanish при входе** и **свободная камера** на телефоне.
 
-![yNfeHafgTGFeod0IynU1cDk-uBhMCkK7WwuMDw3X12gkeXpdqXWFYisGvHfZTEIy8NXyqp-TgxuhUIDnD4lDjOQ1](https://github.com/user-attachments/assets/a0a43cbd-e218-4577-b3de-ac483af410de)
+![Список игроков](https://github.com/user-attachments/assets/a0a43cbd-e218-4577-b3de-ac483af410de)
 
-<img width="777" height="579" alt="image" src="https://github.com/user-attachments/assets/3eaeb8f6-9016-4f71-a24b-6d45ac3fe52c" />
+<img width="777" height="579" alt="Окно игрока" src="https://github.com/user-attachments/assets/3eaeb8f6-9016-4f71-a24b-6d45ac3fe52c" />
 
-## Building for Desktop Testing
+## Настройки
 
-1. Install JDK **17**.
-2. Run `gradlew jar` [1].
-3. Your mod jar will be in the `build/libs` directory. **Only use this version for testing on desktop. It will not work with Android.**
-To build an Android-compatible version, you need the Android SDK. You can either let Github Actions handle this, or set it up yourself. See steps below.
+В настройках игры откройте вкладку «Настройки SimpleAdmin», либо нажмите шестерёнку на панели. Там задаются:
+- размер кнопок;
+- отступ панели от панелей выше;
+- ширина списка;
+- пороги антигрифера;
+- поведение окон.
 
-## Building through Github Actions
+## Установка
 
-This repository is set up with Github Actions CI to automatically build the mod for you every commit. This requires a Github repository, for obvious reasons.
-To get a jar file that works for every platform, do the following:
-1. Make a Github repository with your mod name, and upload the contents of this repo to it. Perform any modifications necessary, then commit and push. 
-2. Check the "Actions" tab on your repository page. Select the most recent commit in the list. If it completed successfully, there should be a download link under the "Artifacts" section. 
-3. Click the download link (should be the name of your repo). This will download a **zipped jar** - **not** the jar file itself [2]! Unzip this file and import the jar contained within in Mindustry. This version should work both on Android and Desktop.
+Скачайте `GL-AdminMode.jar` из [релизов](https://github.com/GLaziness/GL-AdminMode/releases) и импортируйте его в игре: **Моды → Импортировать мод**. Файл работает и на ПК, и на Android.
 
-## Building Locally
+## Сборка
 
-Building locally takes more time to set up, but shouldn't be a problem if you've done Android development before.
-1. Download the Android SDK, unzip it and set the `ANDROID_HOME` environment variable to its location.
-2. Make sure you have API level 30 installed, as well as any recent version of build tools (e.g. 30.0.1)
-3. Add a build-tools folder to your PATH. For example, if you have `30.0.1` installed, that would be `$ANDROID_HOME/build-tools/30.0.1`.
-4. Run `gradlew deploy`. If you did everything correctlly, this will create a jar file in the `build/libs` directory that can be run on both Android and desktop. 
+Нужен JDK 17.
 
-## Adding Dependencies
+- `gradlew jar`: jar только для ПК, появится в `build/libs`.
+- `gradlew deploy`: jar для ПК и Android. Нужен Android SDK: переменная `ANDROID_HOME` и `build-tools` в `PATH`.
 
-Please note that all dependencies on Mindustry, Arc or its submodules **must be declared as compileOnly in Gradle**. Never use `implementation` for core Mindustry or Arc dependencies. 
+При каждом пуше в `master` GitHub Actions сам собирает мод и выкладывает jar в релиз с версией из `mod.hjson`.
 
-- `implementation` **places the entire dependency in the jar**, which is, in most mod dependencies, very undesirable. You do not want the entirety of the Mindustry API included with your mod.
-- `compileOnly` means that the dependency is only around at compile time, and not included in the jar.
+## Авторы
 
-Only use `implementation` if you want to package another Java library *with your mod*, and that library is not present in Mindustry already.
-
---- 
-
-*[1]* *On Linux/Mac it's `./gradlew`, but if you're using Linux I assume you know how to run executables properly anyway.*  
-*[2]: Yes, I know this is stupid. It's a Github UI limitation - while the jar itself is uploaded unzipped, there is currently no way to download it as a single file.*
+- Оригинальный мод: FD, [AbyssOfStarlight/SimpleAdminMode](https://github.com/AbyssOfStarlight/SimpleAdminMode).
+- Доработка и поддержка: [GLaziness](https://github.com/GLaziness).

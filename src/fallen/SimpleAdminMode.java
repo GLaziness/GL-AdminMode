@@ -56,63 +56,7 @@ public class SimpleAdminMode extends Mod {
                 Vars.control.input = newInput;
             }
 
-            ui.hudGroup.fill(t -> {
-                t.name = "sam-hud-button";
-                t.right();
-                t.table(bt -> {
-                    // Создаем кнопку и сохраняем ссылку на её ячейку (Cell)
-                    var adminBtnCell = bt.button(Icon.admin, () -> {
-                    }).size(50f);
-                    var adminBtn = adminBtnCell.get();
-                    final float[] holdTimer = {0f};
-                    final boolean[] longPressedTriggered = {false};
-                    adminBtn.update(() -> {
-                        if (adminBtn.isPressed()) {
-                            holdTimer[0] += Core.graphics.getDeltaTime() * 60f;
-                            if (holdTimer[0] > 60f && !longPressedTriggered[0]) {
-                                Call.sendChatMessage("/history");
-                                longPressedTriggered[0] = true;
-                            }
-                        } else {
-                            holdTimer[0] = 0f;
-                        }
-                    });
-
-                    adminBtn.clicked(() -> {
-                        if (!longPressedTriggered[0]) adminList.toggle();
-                        longPressedTriggered[0] = false;
-                    });
-
-
-                    // --- КНОПКА 2: СВОБОДНАЯ КАМЕРА ---
-                    if (Vars.mobile && Core.settings.getBool("sam-freecam", false)) {
-                        bt.row();
-                        bt.button(Icon.move, Styles.clearNoneTogglei, () -> {
-                            if (Vars.control.input instanceof FreeCamMobileInput fi) {
-                                fi.setFreeCam(!fi.isFreeCam());
-                            }
-                        }).update(b -> {
-                            boolean active = false;
-                            if (Vars.control.input instanceof FreeCamMobileInput fi) {
-                                active = fi.isFreeCam();
-                            }
-                            b.setChecked(active);
-                            b.getImage().setColor(active ? Color.cyan : Color.white);
-                        }).size(45f).tooltip("Free Camera");
-                    }
-
-                    // --- ЛОГИКА СМЕЩЕНИЯ (Y) ---
-                    final int[] lastY = {-1};
-                    bt.update(() -> {
-                        int currentY = Core.settings.getInt("sam-hud-y", 60);
-                        if (lastY[0] != currentY) {
-                            bt.margin(currentY, 0, 0, 10f);
-                            lastY[0] = currentY;
-                            bt.invalidateHierarchy();
-                        }
-                    });
-                });
-            });
+            HudButton.build(adminList);
         });
 
 //        Events.on(PlayerJoin.class, e -> {
@@ -237,12 +181,12 @@ public class SimpleAdminMode extends Mod {
             }).left().row();
 
             addSlider(table, "sam.settings.btnSize", "sam-btn-size", 30, 80, 40);
-            addSlider(table, "sam.settings.hudY", "sam-hud-y", 0, 600, 60);
+            addSlider(table, "sam.settings.hudY", "sam-hud-offset", -50, 300, 4);
 
             table.button(Core.bundle.get("sam.settings.resetSettings"), () -> {
                 Core.settings.put("sam-show-stats", false);
                 Core.settings.put("sam-btn-size", 40);
-                Core.settings.put("sam-hud-y", 60);
+                Core.settings.put("sam-hud-offset", 4);
                 ui.showInfoFade(Core.bundle.get("sam.settings.resetDone"));
             }).margin(10).width(240f).padTop(20f);
         });

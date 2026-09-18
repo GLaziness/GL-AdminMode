@@ -1,20 +1,20 @@
 #the mod name as displayed in-game
-displayName: "SimpleAdminMode"
+displayName: "GL Admin Mode"
 
 #the internal name of your mod
-name: "sam-java-mod"
+name: "gl-admin-mode"
 
 #your name
-author: "FD"
+author: "GLaziness (based on SimpleAdminMode by FD)"
 
 #the fully qualified main class of the mod
 main: "fallen.SimpleAdminMode"
 
 #the mod description as seen in the mod dialog
-description: "Mod for easier tracking and banning."
+description: "Admin tools for tracking players and banning griefers, with a compact HUD panel under the left panels. Based on SimpleAdminMode."
 
 #the mod version
-version: 1.9
+version: 2.0
 
 #the minimum game build required to run this mod
 minGameVersion: 155

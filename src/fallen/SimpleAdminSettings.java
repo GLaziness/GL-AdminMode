@@ -32,7 +32,7 @@ public class SimpleAdminSettings extends BaseDialog {
                 header(table, "sam.settings.interface");
 
                 addSlider(table, "sam.settings.btnSize", "sam-btn-size", 30, 80, 1, 40);
-                addSlider(table, "sam.settings.hudY", "sam-hud-y", -600, 600, 10, 60);
+                addSlider(table, "sam.settings.hudY", "sam-hud-offset", -50, 300, 2, 4);
                 addSlider(table, "sam.settings.listW", "sam-list-w", 200, 1000, 10, 400);
 
                 table.check(Core.bundle.get("sam.settings.closeOutside"), Core.settings.getBool("sam-close-outside", true), val -> Core.settings.put("sam-close-outside", val)).row();
@@ -72,7 +72,7 @@ public class SimpleAdminSettings extends BaseDialog {
                 // Кнопка сброса
                 table.button(Core.bundle.get("sam.settings.resetSettings"), Icon.refresh, () -> {
                     Core.settings.put("sam-btn-size", 40);
-                    Core.settings.put("sam-hud-y", 60);
+                    Core.settings.put("sam-hud-offset", 4);
                     Core.settings.put("sam-list-w", 400);
                     setup();
                     ui.showInfoFade(Core.bundle.get("sam.settings.resetDone"));

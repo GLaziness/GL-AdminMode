@@ -329,6 +329,10 @@ public class SimpleAdminList{
         dialog.show();
     }
 
+    public boolean shown(){
+        return visible;
+    }
+
     public void toggle(){
         visible = !visible;
         if(visible){

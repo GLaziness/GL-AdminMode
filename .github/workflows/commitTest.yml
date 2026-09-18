@@ -55,7 +55,7 @@ jobs:
           else
             echo "Создаю новый релиз $TAG..."
             gh release create "$TAG" "$JAR_PATH" \
-              --title "Release $TAG" \
+              --title "GL Admin Mode $TAG" \
               --notes "Автоматическая сборка версии $VERSION"
           fi
 
