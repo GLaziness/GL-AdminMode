@@ -191,7 +191,7 @@ public class SimpleAdminList{
                         st.left();
                         Label l = st.add(new Label(() -> "[green]+" + user.builds + " [red]-" + user.breaks + " [sky]~" + user.configs)).get();
                         l.setFontScale(0.8f);
-                    }, Styles.cleart, () -> HistoryRender.setTarget(user.name)).height(20f).left();
+                    }, Styles.cleart, () -> HistoryRender.setTarget(user)).height(20f).left();
                 }
             }).minWidth(0f).growX();
 
@@ -213,7 +213,10 @@ public class SimpleAdminList{
                 a.button(Icon.hammer, Styles.clearNonei, () -> {
                     if(hasUuid(user)){
                         Player p = Groups.player.getByID(user.id);
-                        if(p == null) p = Player.create();
+                        if(p == null){
+                            p = Player.create();
+                            p.id = user.id;
+                        }
                         p.name = user.name;
                         new AdvancedBanDialog(p, user.uuid).show();
                     }else{
@@ -245,14 +248,18 @@ public class SimpleAdminList{
             t.defaults().size(220f, 55f).pad(3f);
 
             t.button("@player.ban", Icon.hammer, bstyle, () -> {
-                ui.showConfirm("@confirm", Core.bundle.format("confirmban", user.name),
-                        () -> Call.adminRequest(user.player, AdminAction.ban, null));
+                ui.showConfirm("@confirm", Core.bundle.format("confirmban", user.name), () -> {
+                    Call.adminRequest(user.player, AdminAction.ban, null);
+                    BanKickMessages.ban(user.name, "perm");
+                });
                 dialog.hide();
             }).row();
 
             t.button("@player.kick", Icon.cancel, bstyle, () -> {
-                ui.showConfirm("@confirm", Core.bundle.format("confirmkick", user.name),
-                        () -> Call.adminRequest(user.player, AdminAction.kick, null));
+                ui.showConfirm("@confirm", Core.bundle.format("confirmkick", user.name), () -> {
+                    Call.adminRequest(user.player, AdminAction.kick, null);
+                    BanKickMessages.kick(user.name);
+                });
                 dialog.hide();
             }).row();
 

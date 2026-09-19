@@ -17,7 +17,7 @@ description: "Admin tools for tracking players and banning griefers, with a comp
 repo: "GLaziness/GL-AdminMode"
 
 #the mod version
-version: 2.4
+version: 2.5
 
 #the minimum game build required to run this mod
 minGameVersion: 155

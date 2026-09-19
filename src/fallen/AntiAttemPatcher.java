@@ -2,13 +2,18 @@ package fallen;
 
 import arc.Core;
 import arc.Events;
+import arc.struct.*;
 import arc.util.Log;
+import arc.util.Time;
 import arc.util.Timer;
 import mindustry.Vars;
+import mindustry.content.*;
 import mindustry.game.EventType;
 import mindustry.gen.Building;
 import mindustry.gen.Call;
+import mindustry.gen.Groups;
 import mindustry.gen.Player;
+import mindustry.gen.Unit;
 import mindustry.world.blocks.logic.LogicBlock;
 
 import java.util.ArrayDeque;
@@ -40,6 +45,11 @@ public class AntiAttemPatcher {
     private static boolean processingQueue = false;
     private static boolean loaded = false;
 
+    /** Wait before the automatic freeze, extra wait per admin rank, and no second freeze of one uuid for this long (seconds). */
+    private static final float freezeDelay = 1f, freezeStagger = 0.6f, freezeCooldown = 45f;
+    private static final ObjectFloatMap<String> freezeHandledAt = new ObjectFloatMap<>();
+    private static final ObjectSet<String> freezePending = new ObjectSet<>();
+
 
     public static void load() {
         if (loaded) return;
@@ -47,6 +57,8 @@ public class AntiAttemPatcher {
 
         // Скан при старте мира
         Events.on(EventType.WorldLoadEvent.class, e -> {
+            freezeHandledAt.clear();
+            freezePending.clear();
             if (Core.settings.getBool("sam-aa", true)) {
                 Timer.schedule(() -> {
                     if (Vars.net.client() && Vars.player != null && Vars.player.unit() != null) {
@@ -190,7 +202,7 @@ public class AntiAttemPatcher {
         }
         if (isBad) {
 
-            if (dataUuid != null && !dataUuid.isEmpty()) {
+            if (dataUuid != null && !dataUuid.isEmpty() && !dataUuid.equals("Loading...") && !dataUuid.equals("none") && !dataUuid.equals("admin?")) {
                 if(Core.settings.getBool("sam-aab", false)){
                     if(Core.settings.getBool("sam-oaa", false)) {
                         Call.sendChatMessage(Core.bundle.format("sam.aa.ban-mes", dataName, dataUuid, processor.tileX(), processor.tileY()));
@@ -198,15 +210,75 @@ public class AntiAttemPatcher {
                         Vars.player.sendMessage(Core.bundle.format("sam.aa.ban-mes", dataName, dataUuid, processor.tileX(), processor.tileY()));
                     }
                     Call.sendChatMessage("/ban " + dataUuid + " 1d here 5.2.3 Автоматический бан. https://mindustry.dev/attem" );
+                    BanKickMessages.ban(dataName, "1d");
                 } else {
-                    Call.sendChatMessage(Core.bundle.format("sam.aa.freeze-mes", dataName, dataUuid, processor.tileX(), processor.tileY()));
-                    Call.sendChatMessage("/freeze " + dataUuid);
+                    scheduleSafeFreeze(dataName, dataUuid, processor.tileX(), processor.tileY(), playerData);
                 }
             }
             return true;
         }
         return false;
     }
+    /**
+     * Freezes once, after a short wait staggered by the admin rank, so several admins with the mod
+     * do not toggle the freeze of one player on and off. Skips players that are already frozen. From SimpleAdminMode2.
+     */
+    private static void scheduleSafeFreeze(String name, String uuid, int x, int y, PlayerData data){
+        if(freezePending.contains(uuid) || recentlyHandled(uuid)) return;
+        if(isFrozen(findPlayer(uuid, data))){
+            freezeHandledAt.put(uuid, Time.time);
+            Vars.player.sendMessage(Core.bundle.format("sam.aa.already-frozen", name));
+            return;
+        }
+
+        freezePending.add(uuid);
+        Timer.schedule(() -> {
+            freezePending.remove(uuid);
+            if(recentlyHandled(uuid)) return;
+            freezeHandledAt.put(uuid, Time.time);
+            if(isFrozen(findPlayer(uuid, data))){
+                Vars.player.sendMessage(Core.bundle.format("sam.aa.already-frozen", name));
+                return;
+            }
+            Call.sendChatMessage(Core.bundle.format("sam.aa.freeze-mes", name, uuid, x, y));
+            // "true" only freezes and never unfreezes, unlike the plain /freeze toggle
+            Call.sendChatMessage("/freeze " + uuid + " true");
+            if(data != null) data.autoFrozen = true;
+        }, freezeDelay + adminRank() * freezeStagger);
+    }
+
+    private static boolean recentlyHandled(String uuid){
+        return Time.time - freezeHandledAt.get(uuid, -999999f) < freezeCooldown * 60f;
+    }
+
+    /** Rank among the online admins by id, 0 for the lowest: used only to stagger the freezes. */
+    private static int adminRank(){
+        int rank = 0;
+        for(Player p : Groups.player){
+            if(p.admin && p.id < Vars.player.id) rank++;
+        }
+        return rank;
+    }
+
+    private static Player findPlayer(String uuid, PlayerData data){
+        if(data != null && data.player != null && data.online) return data.player;
+        if(data != null && Groups.player.getByID(data.id) != null) return Groups.player.getByID(data.id);
+        for(PlayerData pd : playerHistory.values()){
+            if(uuid.equals(pd.uuid) && pd.player != null && pd.online) return pd.player;
+        }
+        return null;
+    }
+
+    /** Frozen players get a "block" unit or the freezing / unmoving status from the freeze plugins. */
+    public static boolean isFrozen(Player p){
+        if(p == null) return false;
+        PlayerData pd = playerHistory.get(p.id);
+        if(pd != null && pd.autoFrozen) return true;
+        Unit u = p.unit();
+        if(u == null) return false;
+        return u.type == UnitTypes.block || u.hasEffect(StatusEffects.freezing) || u.hasEffect(StatusEffects.unmoving);
+    }
+
     // Паттерны "плохого" кода(аттемы но не аттемы)
     private static final String[] CONFIRMED_ATTEM = new String[] {
             "read index cell1 1\n" +

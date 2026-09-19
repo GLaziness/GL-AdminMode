@@ -2,7 +2,7 @@ package fallen;
 
 import arc.Events;
 import arc.math.Mathf;
-import arc.util.Strings;
+import arc.util.Log;
 import mindustry.Vars;
 import mindustry.content.Blocks;
 import mindustry.game.EventType.*;
@@ -15,64 +15,66 @@ import mindustry.ui.Fonts;
 
 public class PlayerStatsTracker {
     public static void init() {
-
         Events.on(BlockBuildBeginEvent.class, e -> {
-            if(Core.settings.getBool("sam-ag-build-warn", true) || e.breaking) {
-                antiGrief(e);
-            }
-            if(!Core.settings.getBool("sam-show-stats", false)) return;
-            if(e.unit == null) return;
-            if(e.unit.getPlayer() == null) return;
-            if(playerHistory == null) return;
+            try{
+                if(Core.settings.getBool("sam-ag-build-warn", true) || e.breaking){
+                    antiGrief(e);
+                }
+                if(e.unit == null || e.unit.getPlayer() == null || e.tile == null) return;
+                PlayerData data = playerHistory.get(e.unit.getPlayer().id);
+                if(data == null) return;
 
-            PlayerData data = playerHistory.get(e.unit.getPlayer().id);
+                // the block history is kept when either the history or the stats are on
+                if(historyOn()){
+                    short blockId;
+                    if(e.tile.build instanceof ConstructBlock.ConstructBuild cons && cons.current != null){
+                        blockId = cons.current.id;
+                    }else{
+                        blockId = e.tile.block().id;
+                    }
 
-            if(data == null) return;
+                    int rotation = e.tile.build != null ? e.tile.build.rotation : 0;
+                    Object config = e.tile.build != null ? e.tile.build.config() : null;
 
-            if(Core.settings.getBool("sam-log-save", false)){
-                short blockId;
-                if (e.tile.build instanceof ConstructBlock.ConstructBuild cons) {
-                    blockId = cons.current.id;
-                } else {
-                    blockId = e.tile.block().id;
+                    ActionsHistory.blocksplayersplans.addFirst(new ActionsHistory.BlockPlayerPlan(
+                            e.tile.x, e.tile.y, (short) rotation,
+                            blockId, config,
+                            NameUtil.normalize(data.name), e.breaking, data.id
+                    ));
                 }
 
-                int rotation = e.tile.build != null ? e.tile.build.rotation : 0;
-                Object config = e.tile.build != null ? e.tile.build.config() : null;
-
-                ActionsHistory.blocksplayersplans.addFirst(new ActionsHistory.BlockPlayerPlan(
-                        e.tile.x, e.tile.y, (short) rotation,
-                        blockId, config,
-                        Strings.stripColors(data.name), e.breaking
-                ));
-                //Log.info("Block: " + (e.breaking ? "Removed " : "Placed ") + Vars.content.block(blockId).localizedName);
+                if(e.breaking) data.breaks++;
+                else data.builds++;
+            }catch(Throwable t){
+                Log.err("[GL Admin] build event", t);
             }
-
-            if(e.breaking) data.breaks++;
-            else data.builds++;
         });
 
         Events.on(ConfigEvent.class, e -> {
-            if(!Core.settings.getBool("sam-show-stats", false) || e.player == null) return;
+            if(!Core.settings.getBool("sam-show-stats", false) || e.player == null || e.tile == null) return;
             PlayerData data = playerHistory.get(e.player.id);
             if(data != null) {
                 data.configs++;
-                if(Core.settings.getBool("sam-log-save", false)){
-                    ActionsHistory.blockconfplayersplans.addFirst(new ActionsHistory.BlockConfigPlayerPlan( (int)e.tile.x/8, (int)e.tile.y/8, e.tile.block.id, data.name));
+                if(historyOn()){
+                    ActionsHistory.blockconfplayersplans.addFirst(new ActionsHistory.BlockConfigPlayerPlan( (int)e.tile.x/8, (int)e.tile.y/8, e.tile.block.id, NameUtil.normalize(data.name), data.id));
                 }
             }
         });
 
         Events.on(BuildRotateEvent.class, e -> {
-            if(!Core.settings.getBool("sam-show-stats", false) || e.unit == null || e.unit.getPlayer() == null) return;
+            if(!Core.settings.getBool("sam-show-stats", false) || e.unit == null || e.unit.getPlayer() == null || e.build == null) return;
             PlayerData data = playerHistory.get(e.unit.getPlayer().id);
             if(data != null) {
                 data.configs++;
-                if(Core.settings.getBool("sam-log-save", false)){
-                    ActionsHistory.blockconfplayersplans.addFirst(new ActionsHistory.BlockConfigPlayerPlan( (int)e.build.x/8, (int)e.build.y/8, e.build.block.id, data.name));
+                if(historyOn()){
+                    ActionsHistory.blockconfplayersplans.addFirst(new ActionsHistory.BlockConfigPlayerPlan( (int)e.build.x/8, (int)e.build.y/8, e.build.block.id, NameUtil.normalize(data.name), data.id));
                 }
             }
         });
+    }
+
+    private static boolean historyOn(){
+        return Core.settings.getBool("sam-log-save", false) || Core.settings.getBool("sam-show-stats", false);
     }
 
     private static void antiGrief(BlockBuildBeginEvent e) {

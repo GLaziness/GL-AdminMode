@@ -54,12 +54,40 @@ public class SimpleAdminSettings extends BaseDialog{
             check(t, "@sam.settings.updateCheck", "sam-update-check", true);
         });
 
+        section(Icon.hammer, "@sam.settings.ban", t -> {
+            check(t, "@sam.settings.rollback", "sam-ban-rollback", true);
+            hint(t, "@sam.settings.rollback.hint");
+            check(t, "@sam.settings.evidence.enabled", "sam-evidence-enabled", true);
+            hint(t, "@sam.settings.evidence.hint");
+            t.table(f -> {
+                f.left();
+                f.add("@sam.settings.evidence.path").color(Color.lightGray).padRight(8f);
+                TextField field = f.field(Core.settings.getString("sam-evidence-path", ""), text -> Core.settings.put("sam-evidence-path", text.trim())).growX().height(40f).get();
+                field.setMessageText(BanEvidenceLogger.file().absolutePath());
+                f.button(Icon.refresh, Styles.clearNonei, () -> {
+                    Core.settings.remove("sam-evidence-path");
+                    field.setText("");
+                    ui.showInfoFade(Core.bundle.get("sam.settings.evidence.reset"));
+                }).size(40f).padLeft(4f).tooltip(Core.bundle.get("sam.settings.evidence.reset"));
+                if(!mobile){
+                    f.button(Icon.folder, Styles.clearNonei, () -> Core.app.openFolder(BanEvidenceLogger.file().parent().absolutePath()))
+                        .size(40f).tooltip(Core.bundle.get("sam.settings.evidence.open"));
+                }
+            }).growX().padTop(6f).row();
+            check(t, "@sam.settings.adminBanner", "sam-admin-banner", true);
+        });
+
         section(Icon.chat, "@sam.settings.banAnnounce", t -> {
             check(t, "@sam.settings.banAnnounceOn", "sam-ban-announce", false);
             hint(t, "@sam.settings.banAnnounceHint");
-            t.button("@sam.settings.banAnnounceTest", Icon.eye, Styles.flatt, () ->
-                player.sendMessage("[lightgray](" + Core.bundle.get("sam.settings.banAnnounceTest") + ")[] " + BanMessages.random(player.name, "7d"))
-            ).height(40f).growX().padTop(6f).row();
+            t.table(b -> {
+                b.defaults().height(40f).growX().pad(2f);
+                b.button("@sam.bankick.open", Icon.pencil, Styles.flatt, () -> new BanKickMessageEditor().show());
+                b.button("@sam.settings.banAnnounceTest", Icon.eye, Styles.flatt, () -> {
+                    player.sendMessage("[lightgray](" + Core.bundle.get("sam.settings.banAnnounceTest") + ")[] " + BanKickMessages.random(BanKickMessages.Kind.ban, player.name, "7d"));
+                    player.sendMessage("[lightgray](" + Core.bundle.get("sam.settings.banAnnounceTest") + ")[] " + BanKickMessages.random(BanKickMessages.Kind.kick, player.name, null));
+                });
+            }).growX().padTop(6f).row();
         });
 
         section(Icon.warning, "@sam.settings.antiGrief", t -> {

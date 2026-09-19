@@ -15,36 +15,56 @@ import static mindustry.Vars.*;
 
 public class HistoryRender {
     public static String targetNick = null;
+    /** Player entity id of the target (-1: match by the nick only). Survives the freeze icon in the nick. */
+    public static int targetPlayerId = -1;
     private static float brokenFade = 0f;
-    static float alphaMult = Core.settings.getInt("fadedblockallplayers", 5) / 10f;
+    static float alphaMult = 0.5f;
     private static float nickStartTime = 0f;
     private static float timerAlpha = 1f;
 
     public static void init() {
+        alphaMult = Core.settings.getInt("fadedblockallplayers", 5) / 10f;
 
         Events.run(EventType.Trigger.draw, () -> {
             if (!state.isGame()) return;
-            drawActionHistory();
+            try{
+                drawActionHistory();
+            }catch(Throwable ignored){
+                // never break the draw loop
+            }
         });
     }
 
+    public static void clear(){
+        targetNick = null;
+        targetPlayerId = -1;
+    }
 
-    public static void setTarget(String nick) {
-        if (nick != null && nick.equals(targetNick)) {targetNick = null; return;}
-        targetNick = nick;
+    public static void setTarget(PlayerData data){
+        if(data == null) clear();
+        else setTarget(data.name, data.id);
+    }
+
+    public static void setTarget(String nick, int playerId) {
+        String norm = NameUtil.normalize(nick);
+        boolean same = playerId > 0 ? playerId == targetPlayerId : norm.equals(targetNick);
+        if (same && (targetNick != null || targetPlayerId > 0)) {clear(); return;}
+        targetNick = norm;
+        targetPlayerId = playerId;
         nickStartTime = Time.globalTime;
         timerAlpha = 1f;
-        ui.hudfrag.showToast("[#ffaa55]Просмотр истории:\n[white]" + targetNick);
+        ui.hudfrag.showToast("[#ffaa55]" + Core.bundle.get("sam.history.show") + "\n[white]" + norm);
     }
 
     private static void drawActionHistory() {
         brokenFade = Mathf.lerpDelta(brokenFade, 1f, 0.1f);
-        if (targetNick == null) return;
+        if (targetNick == null && targetPlayerId < 0) return;
 
         float elapsed = (Time.globalTime - nickStartTime) / 60f;
         if (elapsed > 10f) {
-            targetNick = null;
+            clear();
             timerAlpha = 0f;
+            return;
         } else if (elapsed > 7f) {
             // Плавное затухание: с 7 по 10 сек
             timerAlpha = (10f - elapsed) / 3f;
@@ -52,35 +72,20 @@ public class HistoryRender {
             timerAlpha = 1f;
         }
 
-        String cleanFilter = targetNick != null ? getCleanName(targetNick) : null;
-
-        if (cleanFilter != null) {
-            drawBlocks(cleanFilter);
-            drawConfigs(cleanFilter);
-        }
+        drawBlocks();
+        drawConfigs();
     }
 
-    private static String getCleanName(String formattedName) {
-        if (formattedName == null) return null;
-
-        String stripped = Strings.stripColors(formattedName);
-        String[] parts = stripped.split("> ");
-
-        if (parts.length > 1) {
-            return parts[parts.length - 1].trim();
-        }
-
-        return stripped.trim();
+    private static boolean matches(int planPlayerId, String planNick){
+        if(targetPlayerId > 0 && planPlayerId > 0 && planPlayerId == targetPlayerId) return true;
+        if(targetNick == null || targetNick.isEmpty()) return false;
+        return NameUtil.samePlayer(planNick, targetNick);
     }
 
-    private static void drawBlocks(String filter) {
+    private static void drawBlocks() {
 
         for (ActionsHistory.BlockPlayerPlan plan : ActionsHistory.blocksplayersplans) {
-            if (plan.lastacs == null) continue;
-
-            if (filter != null) {
-                if (!Strings.stripColors(plan.lastacs).toLowerCase().contains(filter.toLowerCase())) continue;
-            }
+            if (!matches(plan.playerId, plan.lastacs)) continue;
 
             Block b = content.block(plan.block);
             if (b == null) continue;
@@ -100,15 +105,10 @@ public class HistoryRender {
         }
     }
 
-    private static void drawConfigs(String filter) {
+    private static void drawConfigs() {
 
         for (ActionsHistory.BlockConfigPlayerPlan plan : ActionsHistory.blockconfplayersplans) {
-            if (plan.lastacs == null) continue;
-
-            String cleanPlanName = Strings.stripColors(plan.lastacs);
-            if (filter != null) {
-                if (!cleanPlanName.toLowerCase().contains(filter.toLowerCase())) continue;
-            }
+            if (!matches(plan.playerId, plan.lastacs)) continue;
 
             Block b = content.block(plan.block);
             if (b == null) continue;

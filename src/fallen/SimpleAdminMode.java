@@ -10,6 +10,8 @@ import mindustry.gen.*;
 import mindustry.input.MobileInput;
 import mindustry.mod.Mod;
 import mindustry.net.Administration;
+import mindustry.graphics.Pal;
+import arc.scene.ui.layout.Scl;
 import mindustry.ui.Styles;
 import mindustry.ui.dialogs.TraceDialog;
 
@@ -25,10 +27,43 @@ public class SimpleAdminMode extends Mod {
     private static String lastMapName = "", lastMapAuthor = "", lastServerAddr = "";
     private static double lastPlaytime = 0f;
 
+    /** Banner "an admin joined" under the core items, like the "core under attack" one. */
+    private static final float adminBannerDuration = 240f;
+    private static float adminBannerTime = 0f;
+    private static String adminBannerText = "";
+    private static final IntSet adminBannerShown = new IntSet();
+
+    private static java.lang.reflect.Field chatMessagesField;
+    private static int lastChatSize = -1;
+    private static Object lastChatFirst;
+    private static boolean triggerPadded = false;
+
+    /**
+     * Some clients (FOO and forks) fire Events for Trigger values without a bounds check, so a listener array made
+     * only for low Trigger values crashes when a higher one fires. A no-op listener on the last value pads the array.
+     */
+    public static void ensureTriggerListenersSafe(){
+        if(triggerPadded) return;
+        triggerPadded = true;
+        try{
+            Trigger[] all = Trigger.values();
+            if(all.length > 0) Events.run(all[all.length - 1], () -> {});
+        }catch(Throwable t){
+            Log.err("[GL Admin] Trigger pad failed", t);
+        }
+    }
 
     public SimpleAdminMode() {
+        ensureTriggerListenersSafe();
+
         Events.on(ClientLoadEvent.class, e -> {
+            if(mobile){
+                // phone friendly defaults, only when the player never changed them
+                if(!Core.settings.has("sam-btn-size")) Core.settings.put("sam-btn-size", 48);
+                if(!Core.settings.has("sam-list-w")) Core.settings.put("sam-list-w", Math.min(420, Math.max(280, (int)(Core.scene.getWidth() / Scl.scl(1f) * 0.85f))));
+            }
             PlayerStatsTracker.init();
+            BanEvidenceLogger.init();
             HistoryRender.init();
             AntiAttemPatcher.load();
             adminList.build(Core.scene.root);
@@ -58,6 +93,7 @@ public class SimpleAdminMode extends Mod {
             }
 
             HudButton.build(adminList);
+            setupAdminBanner();
         });
 
 //        Events.on(PlayerJoin.class, e -> {
@@ -86,8 +122,9 @@ public class SimpleAdminMode extends Mod {
                 autoTraceRequested.clear();
                 knownPlayerIds.clear();
                 lastAutoTime.clear();
+                adminBannerShown.clear();
                 ActionsHistory.clearactionhistory();
-                HistoryRender.targetNick = null;
+                HistoryRender.clear();
 
                 Log.info("[SAM] New session detected (Map reset or change). History cleared.");
             } else {
@@ -123,6 +160,9 @@ public class SimpleAdminMode extends Mod {
                 }            }
             if (net.active() && state.isGame() && Core.graphics.getFrameId() % 300 == 0) {
                 checkGriefers();
+            }
+            if (Core.graphics.getFrameId() % 10 == 0) {
+                scrubCannotTrace();
             }
         });
     }
@@ -187,6 +227,70 @@ public class SimpleAdminMode extends Mod {
         }).padTop(10f).row();
     }
 
+    /** Shows the "an admin joined" banner once per player and session. Based on SimpleAdminMode2. */
+    public static void notifyAdminDetected(Player p){
+        if(p == null || p == player || adminBannerShown.contains(p.id)) return;
+        adminBannerShown.add(p.id);
+        if(!Core.settings.getBool("sam-admin-banner", true)) return;
+        adminBannerText = Core.bundle.format("sam.admin.joined", p.name);
+        adminBannerTime = adminBannerDuration;
+    }
+
+    private void setupAdminBanner(){
+        ui.hudGroup.fill(t -> {
+            t.name = "gl-admin-banner";
+            t.top();
+            t.touchable = arc.scene.event.Touchable.disabled;
+            t.update(() -> {
+                if(adminBannerTime > 0f && !state.isPaused()) adminBannerTime -= Time.delta;
+                // right under the core items, where "core under attack" shows up
+                float top = 8f;
+                if(ui.hudfrag.shown && Core.settings.getBool("coreitems", true) && ui.hudfrag.coreItems != null){
+                    float h = ui.hudfrag.coreItems.getHeight() / Scl.scl(1f);
+                    top = h > 1f ? h + 6f : 36f;
+                }
+                if(Core.settings.getBool("macnotch", false)) top += 32f;
+                t.marginTop(top);
+            });
+            t.table(Styles.black6, banner -> {
+                banner.image(Icon.admin).size(20f).padLeft(10f).update(i -> i.setColor(Pal.accent));
+                banner.label(() -> adminBannerText).pad(8f).padRight(12f).update(l ->
+                    l.color.set(Color.orange).lerp(Color.scarlet, arc.math.Mathf.absin(Time.time, 2f, 1f)));
+            }).visible(() -> adminBannerTime > 0f && state.isGame() && ui.hudfrag.shown);
+        });
+    }
+
+    private static boolean isCannotTrace(String message){
+        if(message == null) return false;
+        String clean = Strings.stripColors(message).toLowerCase();
+        return clean.contains("cannot trace") || clean.contains("нельзя отследить") || clean.contains("невозможно отследить");
+    }
+
+    /** Hides the "you cannot trace this player" replies to the automatic traces of admins. */
+    private static void scrubCannotTrace(){
+        if(ui == null || ui.chatfrag == null) return;
+        try{
+            if(chatMessagesField == null){
+                chatMessagesField = mindustry.ui.fragments.ChatFragment.class.getDeclaredField("messages");
+                chatMessagesField.setAccessible(true);
+            }
+            if(!(chatMessagesField.get(ui.chatfrag) instanceof Seq<?> msgs) || msgs.isEmpty()) return;
+            // new messages are inserted at the start: only scan when the newest one changed
+            if(msgs.size == lastChatSize && msgs.first() == lastChatFirst) return;
+            msgs.removeAll(m -> {
+                if(m instanceof String str) return isCannotTrace(str);
+                try{
+                    return m != null && m.getClass().getField("message").get(m) instanceof String str && isCannotTrace(str);
+                }catch(Throwable ignored){
+                    return false;
+                }
+            });
+            lastChatSize = msgs.size;
+            lastChatFirst = msgs.isEmpty() ? null : msgs.first();
+        }catch(Throwable ignored){
+        }
+    }
+
     private void setupTraceOverride() {
         if (originalTraces == null) {
             originalTraces = ui.traces;
@@ -228,6 +332,7 @@ public class SimpleAdminMode extends Mod {
                     data.stopTraceRequests();
                     ui.showInfoFade("[red]- [white]" + data.name);
                 }
+                adminBannerShown.remove(id);
             }
         });
 
@@ -241,11 +346,22 @@ public class SimpleAdminMode extends Mod {
         if (data == null) {
             data = new PlayerData(p);
             playerHistory.put(p.id, data);
-            // Запускаем периодические запросы
-            data.startTraceRequests(p);
+            if(p.admin){
+                // admins cannot be traced: do not spam the server with requests that fail
+                data.uuid = "admin?";
+                notifyAdminDetected(p);
+            }else{
+                data.startTraceRequests(p);
+            }
         } else {
             data.name = p.name;
             data.player = p;
+            data.online = true;
+            if(p.admin && (data.uuid.equals("Loading...") || data.uuid.equals("none"))){
+                data.stopTraceRequests();
+                data.uuid = "admin?";
+                notifyAdminDetected(p);
+            }
         }
     }
 
