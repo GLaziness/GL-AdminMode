@@ -185,6 +185,16 @@ public class SimpleAdminList{
                 // full UUID on its own line, block stats under it
                 Label uuid = text.add("[gray]UUID []" + uuidText + (Core.settings.getBool("sam-fastlang", false) ? "  [gray]" + user.locale : "")).left().get();
                 uuid.setFontScale(0.8f);
+                // click on the UUID line copies the UUID
+                if(hasUuid(user) && !user.uuid.equals("admin?")){
+                    uuid.clicked(() -> {
+                        Core.app.setClipboardText(user.uuid);
+                        ui.showInfoFade(Core.bundle.format("sam.info.copied", "UUID"));
+                    });
+                    uuid.hovered(() -> uuid.setColor(Pal.accent));
+                    uuid.exited(() -> uuid.setColor(Color.white));
+                    if(!mobile) uuid.addListener(new Tooltip(tt -> tt.background(Styles.black6).margin(4f).add(Core.bundle.get("sam.list.copyuuid"))));
+                }
                 text.row();
                 if(Core.settings.getBool("sam-show-stats", false)){
                     text.button(st -> {
