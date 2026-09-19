@@ -37,7 +37,7 @@ public class SimpleAdminSettings extends BaseDialog{
 
         section(Icon.menu, "@sam.settings.interface", t -> {
             slider(t, "@sam.settings.btnSize", "sam-btn-size", 30, 80, 1, 40);
-            slider(t, "@sam.settings.hudY", "sam-hud-offset", -50, 300, 2, 4);
+            slider(t, "@sam.settings.hudY", "sam-hud-offset", -50, 300, 2, 0);
             slider(t, "@sam.settings.listW", "sam-list-w", 200, 1000, 10, 400);
             check(t, "@sam.settings.closeOutside", "sam-close-outside", true);
             check(t, "@sam.settings.closeListOnInfo", "sam-close-list", false);
@@ -134,7 +134,7 @@ public class SimpleAdminSettings extends BaseDialog{
 
         all.button("@sam.settings.resetSettings", Icon.refresh, Styles.flatt, () -> {
             Core.settings.put("sam-btn-size", 40);
-            Core.settings.put("sam-hud-offset", 4);
+            Core.settings.put("sam-hud-offset", 0);
             Core.settings.put("sam-list-w", 400);
             rebuild();
             ui.showInfoFade("@sam.settings.resetDone");

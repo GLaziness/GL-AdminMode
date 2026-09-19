@@ -41,7 +41,7 @@ public class HudButton{
                 if(size != builtSize) rebuild(list);
 
                 if(!timer.get(20f)) return;
-                float pad = Math.max((Core.scene.getHeight() - panelsBottom(full)) / Scl.scl(1f) + Core.settings.getInt("sam-hud-offset", 4), 0f);
+                float pad = Math.max((Core.scene.getHeight() - panelsBottom(full)) / Scl.scl(1f) + Core.settings.getInt("sam-hud-offset", 0), 0f);
                 if(Math.abs(pad - lastPad[0]) > 0.5f){
                     lastPad[0] = pad;
                     cell.padTop(pad);
