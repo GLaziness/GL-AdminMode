@@ -98,22 +98,25 @@ public final class DiscordReport{
         Seq<BanEvidenceLogger.Evt> recent = BanEvidenceLogger.gather(playerId, name, BanEvidenceLogger.window);
         Seq<BanEvidenceLogger.Evt> all = BanEvidenceLogger.gather(playerId, name, BanEvidenceLogger.buffer);
 
-        StringBuilder fields = new StringBuilder();
-        field(fields, "👤 " + Core.bundle.get("sam.discord.player"), "**" + md(nick) + "**\nUUID: `" + uuid + "`", false);
-        field(fields, "🛡️ " + Core.bundle.get("sam.discord.admin"), md(clean(player.name)) + (auto ? " " + Core.bundle.get("sam.discord.auto") : ""), true);
-        field(fields, "🌐 " + Core.bundle.get("sam.discord.scope"), scopeText(scope), true);
-        field(fields, "📜 " + Core.bundle.get("sam.discord.reason"), md(clean(reasonText)), false);
-        field(fields, "⏳ " + Core.bundle.get("sam.discord.length"), BanKickMessages.term(length), true);
+        // Header: UUID, when the ban ends, where it applies (only when not just this server), rollback
         long until = expires(length, now);
-        field(fields, "📅 " + Core.bundle.get("sam.discord.expires"), until < 0 ? Core.bundle.get("sam.discord.never") : "<t:" + until / 1000 + ":f>\n<t:" + until / 1000 + ":R>", true);
-        field(fields, "🗺️ " + Core.bundle.get("sam.discord.map"), md(clean(state.map.name())) + "\n" + Core.bundle.format("sam.discord.wave", state.wave), true);
+        StringBuilder desc = new StringBuilder("UUID `").append(uuid).append('`');
+        desc.append(" · ").append(until < 0 ? Core.bundle.get("sam.discord.never") : Core.bundle.format("sam.discord.until", "<t:" + until / 1000 + ":f>", "<t:" + until / 1000 + ":R>"));
+        if(!"here".equals(scope)) desc.append(" · ").append(scopeText(scope));
+        if(Core.settings.getBool("sam-ban-rollback", true)) desc.append("\n↩️ ").append(Core.bundle.get("sam.discord.rollbackSent"));
 
-        field(fields, "📊 " + Core.bundle.get("sam.discord.lastMinute"), Core.bundle.format("sam.discord.counts",
-            count(recent, BanEvidenceLogger.Kind.building), count(recent, BanEvidenceLogger.Kind.breaking), count(recent, BanEvidenceLogger.Kind.chat)), false);
+        StringBuilder fields = new StringBuilder();
+        field(fields, "📜 " + Core.bundle.get("sam.discord.reason"), md(clean(reasonText)), false);
+        field(fields, "🛡️ " + Core.bundle.get("sam.discord.admin"), md(clean(player.name)) + (auto ? " " + Core.bundle.get("sam.discord.auto") : ""), true);
+        field(fields, "🗺️ " + Core.bundle.get("sam.discord.map"), md(clean(state.map.name())) + " · " + Core.bundle.format("sam.discord.wave", state.wave), true);
+
+        StringBuilder acts = new StringBuilder(Core.bundle.format("sam.discord.counts",
+            count(recent, BanEvidenceLogger.Kind.building), count(recent, BanEvidenceLogger.Kind.breaking), count(recent, BanEvidenceLogger.Kind.chat)));
         if(data != null){
-            field(fields, "📈 " + Core.bundle.get("sam.discord.session"), Core.bundle.format("sam.discord.sessionStats",
-                data.builds, data.breaks, data.configs, data.timesJoined, data.timesKicked), false);
+            acts.append('\n').append(Core.bundle.format("sam.discord.sessionStats", data.builds, data.breaks, data.timesJoined));
+            if(data.timesKicked > 0) acts.append(Core.bundle.format("sam.discord.kicks", data.timesKicked));
         }
+        field(fields, "📊 " + Core.bundle.get("sam.discord.actions"), acts.toString(), false);
 
         Seq<String> chat = all.select(e -> e.kind == BanEvidenceLogger.Kind.chat).map(e -> e.detail);
         if(chat.any()){
@@ -123,14 +126,12 @@ public final class DiscordReport{
             }
             field(fields, "💬 " + Core.bundle.get("sam.discord.chat"), "```\n" + cut(lines.toString(), 1000) + "```", false);
         }
-        if(Core.settings.getBool("sam-ban-rollback", true)){
-            field(fields, "↩️ " + Core.bundle.get("sam.discord.rollback"), Core.bundle.get("sam.discord.rollbackSent"), false);
-        }
 
         String fileName = "ban-" + nick.replaceAll("[^A-Za-z0-9_-]", "_") + "-" + new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date(now)) + ".txt";
         String text = BanEvidenceLogger.format(all, name, uuid, length, reason, now, Core.bundle.get("sam.discord.fileSpan"));
 
-        String embed = "{\"title\":" + json("🔨 " + Core.bundle.format("sam.discord.title", nick))
+        String embed = "{\"title\":" + json("🔨 " + Core.bundle.format("sam.discord.title", nick, BanKickMessages.term(length)))
+            + ",\"description\":" + json(desc.toString())
             + ",\"color\":" + color
             + ",\"fields\":[" + fields + "]"
             + ",\"timestamp\":" + json(iso(now)) + "}";
