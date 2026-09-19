@@ -369,6 +369,22 @@ public class SimpleAdminMode extends Mod {
         }
     }
 
+    /** A rejoin gets a new player id: the offline entries with the same UUID are folded into the new one. */
+    private static void mergeRejoined(int id, PlayerData data){
+        IntSeq old = new IntSeq();
+        for(ObjectMap.Entry<Integer, PlayerData> e : playerHistory){
+            if(e.key != id && !e.value.online && data.uuid.equals(e.value.uuid)) old.add(e.key);
+        }
+        for(int i = 0; i < old.size; i++){
+            PlayerData prev = playerHistory.remove(old.get(i));
+            data.builds += prev.builds;
+            data.breaks += prev.breaks;
+            data.configs += prev.configs;
+            data.griefWarned |= prev.griefWarned;
+            data.autoFrozen |= prev.autoFrozen;
+        }
+    }
+
     public class CustomTraceDialog extends TraceDialog {
         @Override
         public void show(Player player, Administration.TraceInfo info) {
@@ -393,6 +409,7 @@ public class SimpleAdminMode extends Mod {
             boolean wasAuto = autoTraceRequested.contains(player.id);
             if (data != null && info.uuid != null && !info.uuid.isEmpty()) {
                 data.updateFrom(info);
+                mergeRejoined(player.id, data);
             }
             float lastTime = lastAutoTime.get(player.id, 0f);
             boolean isDuplicate = (Time.time - lastTime < 1.5f);
