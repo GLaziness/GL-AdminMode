@@ -23,6 +23,8 @@ public class BanKickMessageEditor extends BaseDialog{
 
     public BanKickMessageEditor(){
         super("@sam.bankick.title");
+        // opened over the settings: a solid background, so their text does not show through
+        background(Styles.black9);
         addCloseButton();
         shown(this::rebuild);
         onResize(this::rebuild);
@@ -88,6 +90,7 @@ public class BanKickMessageEditor extends BaseDialog{
     /** Edits one template (index -1 adds a new one): a text field, buttons that insert the variables and a live preview. */
     private void edit(int index){
         BaseDialog dialog = new BaseDialog(index < 0 ? "@sam.bankick.add" : "@sam.bankick.edit");
+        dialog.background(Styles.black9);
         float w = Math.min(600f, Core.graphics.getWidth() / Scl.scl(1f) - 40f);
         String start = index >= 0 ? list.get(index) : kind.prefix + BanKickMessages.nick + " ";
 

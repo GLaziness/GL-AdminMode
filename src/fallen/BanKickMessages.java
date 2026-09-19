@@ -102,7 +102,18 @@ public final class BanKickMessages{
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)([shdwmy]?)").matcher(length);
         if(!m.matches()) return length;
         String unit = m.group(2).isEmpty() ? "min" : m.group(2);
-        return Core.bundle.format(unit.equals("d") ? "sam.ban.days" : "sam.ban.unit." + unit, m.group(1));
+        long n = Long.parseLong(m.group(1));
+        // "one|few|many" word forms: 1 день, 3 дня, 7 дней; 1 day, 7 days
+        String[] forms = Core.bundle.get("sam.ban.unit." + unit).split("\\|");
+        int form = forms.length >= 3 ? plural(n) : n == 1 ? 0 : 1;
+        return n + " " + forms[Math.min(form, forms.length - 1)];
+    }
+
+    /** Russian plural rule, used when the bundle gives three forms: 0 one, 1 few, 2 many. */
+    private static int plural(long n){
+        if(n % 10 == 1 && n % 100 != 11) return 0;
+        if(n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) return 1;
+        return 2;
     }
 
     /** Sent a bit after the command, so the server does not count it as spam. */
