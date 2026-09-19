@@ -210,6 +210,7 @@ public class AntiAttemPatcher {
                         Vars.player.sendMessage(Core.bundle.format("sam.aa.ban-mes", dataName, dataUuid, processor.tileX(), processor.tileY()));
                     }
                     Call.sendChatMessage("/ban " + dataUuid + " 1d here 5.2.3 Автоматический бан. https://mindustry.dev/attem" );
+                    DiscordReport.ban(playerData, playerData.id, dataName, dataUuid, "1d", "5.2.3", Core.bundle.get("sam.discord.attem"), "here", true);
                     BanKickMessages.ban(dataName, "1d");
                 } else {
                     scheduleSafeFreeze(dataName, dataUuid, processor.tileX(), processor.tileY(), playerData);

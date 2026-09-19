@@ -77,6 +77,27 @@ public class SimpleAdminSettings extends BaseDialog{
             check(t, "@sam.settings.adminBanner", "sam-admin-banner", true);
         });
 
+        section(Icon.discord, "@sam.settings.discordTitle", t -> {
+            check(t, "@sam.settings.discord", "sam-discord", true);
+            hint(t, "@sam.settings.discord.hint");
+            t.add("@sam.settings.discord.webhook").color(Color.lightGray).padTop(8f).row();
+            t.table(f -> {
+                TextField url = f.field(DiscordReport.webhook(), text -> Core.settings.put("sam-discord-webhook", text.trim())).growX().height(40f).get();
+                url.setPasswordMode(true);
+                url.setPasswordCharacter('*');
+                url.setMessageText("https://discord.com/api/webhooks/...");
+                f.button(Icon.eyeSmall, Styles.clearNonei, () -> {
+                    url.setPasswordMode(!url.isPasswordMode());
+                    url.setText(url.getText());
+                }).size(40f).padLeft(4f);
+            }).growX().row();
+            t.add("@sam.settings.discord.servers").color(Color.lightGray).padTop(8f).row();
+            t.field(Core.settings.getString("sam-discord-servers", DiscordReport.defaultServers), text -> Core.settings.put("sam-discord-servers", text.trim()))
+                .growX().height(40f).get().setMessageText(DiscordReport.defaultServers);
+            t.row();
+            t.button("@sam.settings.discord.test", Icon.upload, Styles.flatt, DiscordReport::test).height(40f).growX().padTop(8f).row();
+        });
+
         section(Icon.chat, "@sam.settings.banAnnounce", t -> {
             check(t, "@sam.settings.banAnnounceOn", "sam-ban-announce", false);
             hint(t, "@sam.settings.banAnnounceHint");

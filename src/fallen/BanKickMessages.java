@@ -99,10 +99,10 @@ public final class BanKickMessages{
     /** Ban length as sent to /ban ("perm", "7d", "12h"...) in words. */
     public static String term(String length){
         if(length.equals("perm")) return Core.bundle.get("sam.ban.forever");
-        if(length.endsWith("d") && Strings.canParseInt(length.substring(0, length.length() - 1))){
-            return Core.bundle.format("sam.ban.days", Strings.parseInt(length.substring(0, length.length() - 1)));
-        }
-        return length;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+)([shdwmy]?)").matcher(length);
+        if(!m.matches()) return length;
+        String unit = m.group(2).isEmpty() ? "min" : m.group(2);
+        return Core.bundle.format(unit.equals("d") ? "sam.ban.days" : "sam.ban.unit." + unit, m.group(1));
     }
 
     /** Sent a bit after the command, so the server does not count it as spam. */

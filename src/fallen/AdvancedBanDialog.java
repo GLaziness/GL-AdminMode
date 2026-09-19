@@ -77,6 +77,7 @@ public class AdvancedBanDialog extends BaseDialog{
                 t.left().margin(8f).defaults().left().padTop(2f);
                 t.check("@sam.settings.rollback", Core.settings.getBool("sam-ban-rollback", true), v -> Core.settings.put("sam-ban-rollback", v)).row();
                 t.check("@sam.settings.evidence.enabled", BanEvidenceLogger.enabled(), v -> Core.settings.put("sam-evidence-enabled", v)).row();
+                t.check("@sam.settings.discord", DiscordReport.enabled(), v -> Core.settings.put("sam-discord", v)).row();
                 t.check("@sam.settings.banAnnounceOn", BanKickMessages.enabled(), v -> Core.settings.put("sam-ban-announce", v)).row();
             }).width(width).row();
         }).scrollX(false).grow();
@@ -159,7 +160,7 @@ public class AdvancedBanDialog extends BaseDialog{
             }else{
                 row.add("[scarlet]" + Core.bundle.get("sam.ban.perm")).width(56f).padLeft(6f).get().setAlignment(Align.center);
             }
-            row.button(Icon.hammer, Styles.clearNonei, () -> ban(length.get(), r.id.replace("p", "")))
+            row.button(Icon.hammer, Styles.clearNonei, () -> ban(length.get(), r.id.replace("p", ""), Core.bundle.get(key(r.id))))
                 .size(42f).tooltip(Core.bundle.get("sam.list.ban")).get().getImage().setColor(Color.scarlet);
         }).width(width - (table == rules ? 0f : 12f)).minHeight(46f).padBottom(2f).row();
     }
@@ -184,7 +185,7 @@ public class AdvancedBanDialog extends BaseDialog{
                 }else if(!validTime(length.isEmpty() ? "1d" : length)){
                     ui.showInfoFade(Core.bundle.get("sam.ban.custom.badtime"));
                 }else{
-                    ban(length.isEmpty() ? "1d" : length, text);
+                    ban(length.isEmpty() ? "1d" : length, text, text);
                 }
             }).growX().height(42f).padLeft(8f);
         }).growX().padTop(6f);
@@ -195,7 +196,7 @@ public class AdvancedBanDialog extends BaseDialog{
         return time.equals("perm") || time.matches("\\d+[shdwmy]?");
     }
 
-    private void ban(String length, String reason){
+    private void ban(String length, String reason, String reasonText){
         String cmd = Strings.format("/ban @ @ @ @", uuid, length, scope, reason);
         Call.sendChatMessage(cmd);
         player.sendMessage("[gray][" + Core.bundle.get("sam.ban.sent") + "]: [white]" + cmd);
@@ -208,6 +209,11 @@ public class AdvancedBanDialog extends BaseDialog{
                 player.sendMessage("[gray][" + Core.bundle.get("sam.ban.sent") + "]: [white]/rollback " + uuid);
             });
         }
+        PlayerData data = null;
+        for(PlayerData d : SimpleAdminMode.playerHistory.values()){
+            if(d.id == playerId || uuid.equals(d.uuid)) data = d;
+        }
+        DiscordReport.ban(data, playerId, name, uuid, length, reason, reasonText, scope, false);
         BanKickMessages.ban(name, length);
         hide();
     }

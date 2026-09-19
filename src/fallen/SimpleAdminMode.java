@@ -64,6 +64,7 @@ public class SimpleAdminMode extends Mod {
             }
             PlayerStatsTracker.init();
             BanEvidenceLogger.init();
+            DiscordReport.init();
             HistoryRender.init();
             AntiAttemPatcher.load();
             adminList.build(Core.scene.root);
