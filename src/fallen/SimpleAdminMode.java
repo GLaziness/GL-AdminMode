@@ -165,6 +165,9 @@ public class SimpleAdminMode extends Mod {
             if (Core.graphics.getFrameId() % 10 == 0) {
                 scrubCannotTrace();
             }
+            if (Core.graphics.getFrameId() % 600 == 0) {
+                DiscordReport.update();
+            }
         });
     }
 

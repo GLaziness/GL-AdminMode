@@ -80,16 +80,14 @@ public class SimpleAdminSettings extends BaseDialog{
         section(Icon.discord, "@sam.settings.discordTitle", t -> {
             check(t, "@sam.settings.discord", "sam-discord", true);
             hint(t, "@sam.settings.discord.hint");
-            t.add("@sam.settings.discord.key").color(Color.lightGray).padTop(8f).row();
-            t.table(f -> {
-                TextField url = f.field(DiscordReport.key(), text -> Core.settings.put("sam-discord-key", text.trim())).growX().height(40f).get();
-                url.setPasswordMode(true);
-                url.setPasswordCharacter('*');
-                url.setMessageText("glr_...");
-                f.button(Icon.eyeSmall, Styles.clearNonei, () -> {
-                    url.setPasswordMode(!url.isPasswordMode());
-                    url.setText(url.getText());
-                }).size(40f).padLeft(4f);
+            t.table(k -> {
+                k.left();
+                k.label(() -> DiscordReport.validKey(DiscordReport.key()) ? Core.bundle.get("sam.settings.discord.keyOk") : Core.bundle.get("sam.settings.discord.keyNone"))
+                    .growX().left().wrap().padTop(8f);
+                k.button(Icon.refresh, Styles.clearNonei, () -> ui.showConfirm("@confirm", "@sam.settings.discord.keyReset.confirm", () -> {
+                    DiscordReport.resetKey();
+                    ui.showInfoFade(Core.bundle.get("sam.settings.discord.keyReset.done"));
+                })).size(40f).padLeft(4f).tooltip(Core.bundle.get("sam.settings.discord.keyReset"));
             }).growX().row();
             t.add("@sam.settings.discord.servers").color(Color.lightGray).padTop(8f).row();
             t.field(Core.settings.getString("sam-discord-servers", DiscordReport.defaultServers), text -> Core.settings.put("sam-discord-servers", text.trim()))

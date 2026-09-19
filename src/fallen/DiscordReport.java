@@ -33,6 +33,10 @@ public final class DiscordReport{
     private static volatile String serverIp = "";
     private static volatile int serverPort;
 
+    private static volatile String pendingKey;
+    private static volatile boolean registering, blocked;
+    private static volatile long lastRegister;
+
     private DiscordReport(){}
 
     public static void init(){
@@ -54,9 +58,18 @@ public final class DiscordReport{
         return Core.settings.getBool("sam-discord", true);
     }
 
-    /** The admin's own key for the relay, given by the owner of the relay. */
+    /** The admin's own key for the relay; the mod gets it by itself. */
     public static String key(){
-        return Core.settings.getString("sam-discord-key", "").trim();
+        String key = Core.settings.getString("sam-discord-key", "").trim();
+        return key.isEmpty() && pendingKey != null ? pendingKey : key;
+    }
+
+    /** Forgets the key, the mod asks for a new one on the next visit to the server. */
+    public static void resetKey(){
+        Core.settings.remove("sam-discord-key");
+        pendingKey = null;
+        blocked = false;
+        lastRegister = 0;
     }
 
     public static boolean validKey(String key){
@@ -77,7 +90,7 @@ public final class DiscordReport{
      * @param reasonText rule text or the custom reason, shown in the embed
      */
     public static void ban(PlayerData data, int playerId, String name, String uuid, String length, String reason, String reasonText, String scope, boolean auto){
-        if(!enabled() || !validKey(key()) || !allowedServer()) return;
+        if(!enabled() || !allowedServer()) return;
 
         long now = System.currentTimeMillis();
         String nick = clean(name);
@@ -146,38 +159,106 @@ public final class DiscordReport{
     private static void send(String embed, String fileName, String fileText, boolean test){
         String body = "{\"server\":" + json(serverIp + ":" + serverPort) + ",\"test\":" + test + ",\"embed\":" + embed
             + (fileName != null ? ",\"file_name\":" + json(fileName) + ",\"file\":" + json(fileText) : "") + "}";
-        String key = key();
 
         Threads.daemon("gl-admin-report", () -> {
-            String code;
-            try{
-                byte[] data = body.getBytes(StandardCharsets.UTF_8);
-                SSLContext ctx = SSLContext.getInstance("TLS");
-                ctx.init(null, new TrustManager[]{new PinnedTrust()}, new SecureRandom());
-                try(Socket raw = new Socket()){
-                    raw.connect(new InetSocketAddress(relayHost, relayPort), 10000);
-                    raw.setSoTimeout(30000);
-                    try(SSLSocket socket = (SSLSocket)ctx.getSocketFactory().createSocket(raw, relayHost, relayPort, true)){
-                        socket.startHandshake();
-                        OutputStream out = socket.getOutputStream();
-                        out.write(("{\"t\":\"report\",\"v\":1,\"key\":" + json(key) + ",\"size\":" + data.length + "}\n").getBytes(StandardCharsets.UTF_8));
-                        out.write(data);
-                        out.flush();
-                        String answer = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8)).readLine();
-                        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"code\":\\s*\"(\\w+)\"").matcher(answer == null ? "" : answer);
-                        code = answer != null && answer.matches(".*\"ok\":\\s*true.*") ? null : m.find() ? m.group(1) : "noanswer";
-                    }
-                }
-            }catch(Throwable t){
-                Log.err("[GL Admin] ban report", t);
-                code = "connect";
+            // no key yet (the admin bans right after joining): get it first
+            if(!validKey(key()) && !register()){
+                Core.app.post(() -> ui.showInfoFade(Core.bundle.format("sam.discord.failed", Core.bundle.get("sam.discord.error.nokey"))));
+                return;
             }
-            String result = code;
+            byte[] data = body.getBytes(StandardCharsets.UTF_8);
+            String code = code(exchange("{\"t\":\"report\",\"v\":1,\"key\":" + json(key()) + ",\"size\":" + data.length + "}", data));
+            // the key was removed on the server: forget it, the mod asks for a new one (unless its install is blocked)
+            if("badkey".equals(code)){
+                pendingKey = null;
+                Core.app.post(() -> Core.settings.remove("sam-discord-key"));
+            }
             Core.app.post(() -> {
-                if(result == null) ui.showInfoFade(Core.bundle.get(test ? "sam.discord.sent" : "sam.discord.banSent"));
-                else ui.showInfoFade(Core.bundle.format("sam.discord.failed", Core.bundle.get("sam.discord.error." + result, result)));
+                if(code == null) ui.showInfoFade(Core.bundle.get(test ? "sam.discord.sent" : "sam.discord.banSent"));
+                else ui.showInfoFade(Core.bundle.format("sam.discord.failed", Core.bundle.get("sam.discord.error." + code, code)));
             });
         });
+    }
+
+    /** Asks for a key every few minutes while the player is an admin on an allowed server and has no key. */
+    public static void update(){
+        if(!enabled() || validKey(key()) || blocked || registering || !player.admin || !allowedServer()) return;
+        if(Time.timeSinceMillis(lastRegister) < 5 * 60 * 1000L) return;
+        lastRegister = Time.millis();
+        registering = true;
+        Threads.daemon("gl-admin-register", () -> {
+            try{
+                if(register()) Core.app.post(() -> ui.showInfoFade(Core.bundle.get("sam.discord.gotKey")));
+            }finally{
+                registering = false;
+            }
+        });
+    }
+
+    /** Gets a key from the relay (blocking, call off the main thread). The owner gets a Discord message about it. */
+    private static boolean register(){
+        if(!player.admin || !allowedServer()) return false;
+        String answer = exchange("{\"t\":\"register\",\"v\":1,\"install\":" + json(install()) + ",\"nick\":" + json(clean(player.name))
+            + ",\"server\":" + json(serverIp + ":" + serverPort) + ",\"admin\":true}", null);
+        String code = code(answer);
+        if(code == null){
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"key\":\\s*\"(glr_[\\w-]+)\"").matcher(answer);
+            if(m.find()){
+                String key = m.group(1);
+                Core.app.post(() -> Core.settings.put("sam-discord-key", key));
+                // the settings are written on the main thread, keep the key for the report that waits for it
+                pendingKey = key;
+                return true;
+            }
+            return false;
+        }
+        if(code.equals("blocked")) blocked = true;
+        Log.warn("[GL Admin] report key refused: @", code);
+        return false;
+    }
+
+    /** A random id of this install, so asking again gives the same admin a new key instead of a second one. */
+    private static String install(){
+        String id = Core.settings.getString("sam-discord-install", "");
+        if(!id.matches("[0-9a-f]{32,64}")){
+            byte[] bytes = new byte[16];
+            new SecureRandom().nextBytes(bytes);
+            id = hex(bytes);
+            Core.settings.put("sam-discord-install", id);
+        }
+        return id;
+    }
+
+    /** null when the answer is {"ok":true}, else its error code. */
+    private static String code(String answer){
+        if(answer == null) return "connect";
+        if(answer.matches(".*\"ok\":\\s*true.*")) return null;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"code\":\\s*\"(\\w+)\"").matcher(answer);
+        return m.find() ? m.group(1) : "noanswer";
+    }
+
+    /** One request to the relay over TLS with the pinned certificate: a header line and an optional body. Returns the answer line or null. */
+    private static String exchange(String head, byte[] body){
+        try{
+            SSLContext ctx = SSLContext.getInstance("TLS");
+            ctx.init(null, new TrustManager[]{new PinnedTrust()}, new SecureRandom());
+            try(Socket raw = new Socket()){
+                raw.connect(new InetSocketAddress(relayHost, relayPort), 10000);
+                raw.setSoTimeout(30000);
+                try(SSLSocket socket = (SSLSocket)ctx.getSocketFactory().createSocket(raw, relayHost, relayPort, true)){
+                    socket.startHandshake();
+                    OutputStream out = socket.getOutputStream();
+                    out.write((head + "\n").getBytes(StandardCharsets.UTF_8));
+                    if(body != null) out.write(body);
+                    out.flush();
+                    String answer = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8)).readLine();
+                    return answer == null ? "{\"ok\":false,\"code\":\"noanswer\"}" : answer;
+                }
+            }
+        }catch(Throwable t){
+            Log.err("[GL Admin] ban report", t);
+            return null;
+        }
     }
 
     private static String hex(byte[] bytes){
