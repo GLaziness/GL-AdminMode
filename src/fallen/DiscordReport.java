@@ -98,16 +98,16 @@ public final class DiscordReport{
         Seq<BanEvidenceLogger.Evt> recent = BanEvidenceLogger.gather(playerId, name, BanEvidenceLogger.window);
         Seq<BanEvidenceLogger.Evt> all = BanEvidenceLogger.gather(playerId, name, BanEvidenceLogger.buffer);
 
-        // Header: UUID, when the ban ends, where it applies (only when not just this server), rollback
+        // Header: UUID, when the ban ends, rollback
         long until = expires(length, now);
         StringBuilder desc = new StringBuilder("UUID `").append(uuid).append('`');
         desc.append(" · ").append(until < 0 ? Core.bundle.get("sam.discord.never") : Core.bundle.format("sam.discord.until", "<t:" + until / 1000 + ":f>", "<t:" + until / 1000 + ":R>"));
-        if(!"here".equals(scope)) desc.append(" · ").append(scopeText(scope));
         if(Core.settings.getBool("sam-ban-rollback", true)) desc.append("\n↩️ ").append(Core.bundle.get("sam.discord.rollbackSent"));
 
         StringBuilder fields = new StringBuilder();
         field(fields, "📜 " + Core.bundle.get("sam.discord.reason"), md(clean(reasonText)), false);
         field(fields, "🛡️ " + Core.bundle.get("sam.discord.admin"), md(clean(player.name)) + (auto ? " " + Core.bundle.get("sam.discord.auto") : ""), true);
+        field(fields, "🌐 " + Core.bundle.get("sam.discord.where"), "here".equals(scope) ? modeName() : scopeText(scope), true);
         field(fields, "🗺️ " + Core.bundle.get("sam.discord.map"), md(clean(state.map.name())) + " · " + Core.bundle.format("sam.discord.wave", state.wave), true);
 
         StringBuilder acts = new StringBuilder(Core.bundle.format("sam.discord.counts",
@@ -309,6 +309,20 @@ public final class DiscordReport{
             default: unit = 60_000L;
         }
         return now + n * unit;
+    }
+
+    /** Modes of the 404ru servers by port, shown instead of "this server". */
+    private static final String[][] modes = {
+        {"6547", "Hub"}, {"6548", "Fast pvp"}, {"6549", "Survival"}, {"6551", "PvP"}, {"6552", "Sandbox"},
+        {"6553", "Tower Defense"}, {"6554", "Erekir attack"}, {"6555", "Erekir survival"}, {"6557", "Attack"}
+    };
+
+    private static String modeName(){
+        String port = String.valueOf(serverPort);
+        for(String[] m : modes){
+            if(m[0].equals(port)) return m[1];
+        }
+        return Core.bundle.get("sam.discord.scope.here") + " (" + port + ")";
     }
 
     private static String scopeText(String scope){
