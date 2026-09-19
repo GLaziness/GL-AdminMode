@@ -30,9 +30,14 @@
 - **Сам проверяет обновления**: при запуске игры сверяется с релизами на GitHub и предлагает обновиться в один клик (можно выключить в настройках).
 - **Vanish при входе** и **свободная камера** на телефоне.
 
-![Список игроков](https://github.com/user-attachments/assets/a0a43cbd-e218-4577-b3de-ac483af410de)
-
-<img width="777" height="579" alt="Окно игрока" src="https://github.com/user-attachments/assets/3eaeb8f6-9016-4f71-a24b-6d45ac3fe52c" />
+<p>
+<img src="screenshots/panel.png" alt="Панель на HUD" width="240">
+<img src="screenshots/players.png" alt="Список игроков" width="420">
+</p>
+<p>
+<img src="screenshots/ban.png" alt="Окно бана" width="460">
+<img src="screenshots/settings.png" alt="Настройки" width="460">
+</p>
 
 ## Настройки
 
