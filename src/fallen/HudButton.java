@@ -120,7 +120,9 @@ public class HudButton{
             if(e instanceof Table table && table.getBackground() != null){
                 Vec2 pos = e.localToStageCoordinates(Tmp.v1.set(0f, 0f));
                 float top = pos.y + e.getHeight();
-                if(pos.x <= Scl.scl(10f) && e.getWidth() < Core.scene.getWidth() / 2f && top >= Core.scene.getHeight() / 2f){
+                // only tables covering the screen both ways are skipped: in a narrow window the panels are most of its width
+                boolean small = e.getWidth() < Core.scene.getWidth() * 0.8f || e.getHeight() < Core.scene.getHeight() * 0.8f;
+                if(pos.x <= Scl.scl(10f) && small && top >= Core.scene.getHeight() / 2f){
                     bottom[0] = Math.min(bottom[0], pos.y);
                 }
             }
