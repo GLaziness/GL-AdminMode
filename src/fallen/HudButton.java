@@ -87,7 +87,7 @@ public class HudButton{
             info.label(() -> Core.bundle.format("sam.hud.players", Groups.player.size())).style(Styles.outlineLabel).color(Color.lightGray).fontScale(0.7f);
         }).height(size).padLeft(6f).padRight(6f);
 
-        tooltip(panel.button(Icon.book, Styles.clearNonei, icon, () -> Call.sendChatMessage("/history")).size(size).get(), "sam.hud.history");
+        tooltip(panel.button(Icon.cancel, Styles.clearNonei, icon, () -> Call.sendChatMessage("/vote c")).size(size).get(), "sam.hud.voteCancel");
         tooltip(panel.button(Icon.settings, Styles.clearNonei, icon, () -> new SimpleAdminSettings().show()).size(size).get(), "sam.hud.settings");
 
         if(Vars.mobile && Core.settings.getBool("sam-freecam", false)){
