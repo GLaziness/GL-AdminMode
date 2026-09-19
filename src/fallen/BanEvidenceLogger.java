@@ -5,6 +5,7 @@ import arc.files.*;
 import arc.struct.*;
 import arc.util.*;
 import mindustry.game.EventType.*;
+import mindustry.gen.*;
 import mindustry.world.*;
 import mindustry.world.blocks.*;
 
@@ -25,7 +26,8 @@ public final class BanEvidenceLogger{
     private static final String defaultName = "gl-admin-evidence.txt";
 
     private static final Seq<Evt> events = new Seq<>();
-    private static boolean loaded;
+    private static boolean loaded, chatEvents;
+    private static final IntFloatMap chatFade = new IntFloatMap();
 
     private BanEvidenceLogger(){}
 
@@ -53,8 +55,22 @@ public final class BanEvidenceLogger{
         });
 
         Events.on(PlayerChatEvent.class, e -> {
+            if(e.player != null) chatEvents = true;
             if(!collecting() || e.player == null || e.message == null || e.message.startsWith("/")) return;
             add(e.player.id, e.player.name, Kind.chat, Strings.stripColors(e.message));
+        });
+
+        // the vanilla game does not tell the players about chat messages (only GL / Foo's Client does): there a message
+        // is noticed by the text over the player's head being shown again
+        Events.run(Trigger.update, () -> {
+            if(chatEvents || !collecting() || !net.client()) return;
+            for(Player p : Groups.player){
+                float last = chatFade.get(p.id, -1f);
+                chatFade.put(p.id, p.textFadeTime);
+                if(last >= 0f && p.textFadeTime > last + 0.001f && p.lastText != null && !p.lastText.startsWith("/")){
+                    add(p.id, p.name, Kind.chat, Strings.stripColors(p.lastText));
+                }
+            }
         });
 
         Events.on(WorldLoadEvent.class, e -> trim());

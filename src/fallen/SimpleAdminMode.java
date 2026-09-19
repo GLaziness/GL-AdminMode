@@ -64,6 +64,7 @@ public class SimpleAdminMode extends Mod {
             }
             PlayerStatsTracker.init();
             BanEvidenceLogger.init();
+            SessionJournal.init();
             DiscordReport.init();
             HistoryRender.init();
             AntiAttemPatcher.load();
@@ -264,7 +265,7 @@ public class SimpleAdminMode extends Mod {
         });
     }
 
-    private static boolean isCannotTrace(String message){
+    static boolean isCannotTrace(String message){
         if(message == null) return false;
         String clean = Strings.stripColors(message).toLowerCase();
         return clean.contains("cannot trace") || clean.contains("нельзя отследить") || clean.contains("невозможно отследить");

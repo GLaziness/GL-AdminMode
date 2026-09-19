@@ -77,6 +77,19 @@ public class SimpleAdminSettings extends BaseDialog{
             check(t, "@sam.settings.adminBanner", "sam-admin-banner", true);
         });
 
+        section(Icon.book, "@sam.settings.journal", t -> {
+            check(t, "@sam.settings.journal.enabled", "sam-journal", true);
+            hint(t, "@sam.settings.journal.hint");
+            slider(t, "@sam.settings.journal.days", "sam-journal-days", 1, 60, 1, 14);
+            if(!mobile){
+                t.button("@sam.settings.journal.open", Icon.folder, Styles.flatt, () -> {
+                    SessionJournal.flush();
+                    SessionJournal.folder().mkdirs();
+                    Core.app.openFolder(SessionJournal.folder().absolutePath());
+                }).height(40f).growX().padTop(8f).row();
+            }
+        });
+
         section(Icon.discord, "@sam.settings.discordTitle", t -> {
             check(t, "@sam.settings.discord", "sam-discord", true);
             hint(t, "@sam.settings.discord.hint");
