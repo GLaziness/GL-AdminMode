@@ -22,7 +22,8 @@ import static mindustry.Vars.*;
  * Only bans on the servers from the list are sent.
  */
 public final class DiscordReport{
-    public static final String defaultServers = "80.66.89.54";
+    /** Game servers whose bans are reported. The relay checks its own list too, so changing this gives nothing. */
+    public static final String servers = "80.66.89.54";
     /** The relay (gl-reports on the GL server) and the SHA-256 of its certificate. */
     private static final String relayHost = "2.26.10.69";
     private static final int relayPort = 7161;
@@ -79,7 +80,7 @@ public final class DiscordReport{
     /** Whether bans on the current server go to Discord. */
     public static boolean allowedServer(){
         if(!net.client() || serverIp.isEmpty()) return false;
-        for(String s : Core.settings.getString("sam-discord-servers", defaultServers).split("[,\\s]+")){
+        for(String s : servers.split("[,\\s]+")){
             if(!s.isEmpty() && (s.equals(serverIp) || s.equals(serverIp + ":" + serverPort))) return true;
         }
         return false;
@@ -144,7 +145,7 @@ public final class DiscordReport{
         }
         StringBuilder fields = new StringBuilder();
         field(fields, Core.bundle.get("sam.discord.admin"), md(clean(player.name)), true);
-        field(fields, Core.bundle.get("sam.discord.servers"), "`" + Core.settings.getString("sam-discord-servers", defaultServers) + "`", true);
+        field(fields, Core.bundle.get("sam.discord.servers"), "`" + servers + "`", true);
         String embed = "{\"title\":" + json("✅ " + Core.bundle.get("sam.discord.testTitle"))
             + ",\"description\":" + json(Core.bundle.get("sam.discord.testText"))
             + ",\"color\":" + testColor + ",\"fields\":[" + fields + "]"

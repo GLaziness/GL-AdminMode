@@ -89,10 +89,7 @@ public class SimpleAdminSettings extends BaseDialog{
                     ui.showInfoFade(Core.bundle.get("sam.settings.discord.keyReset.done"));
                 })).size(40f).padLeft(4f).tooltip(Core.bundle.get("sam.settings.discord.keyReset"));
             }).growX().row();
-            t.add("@sam.settings.discord.servers").color(Color.lightGray).padTop(8f).row();
-            t.field(Core.settings.getString("sam-discord-servers", DiscordReport.defaultServers), text -> Core.settings.put("sam-discord-servers", text.trim()))
-                .growX().height(40f).get().setMessageText(DiscordReport.defaultServers);
-            t.row();
+            t.add(Core.bundle.format("sam.settings.discord.server", DiscordReport.servers)).color(Color.lightGray).left().padTop(8f).row();
             t.button("@sam.settings.discord.test", Icon.upload, Styles.flatt, DiscordReport::test).height(40f).growX().padTop(8f).row();
         });
 
