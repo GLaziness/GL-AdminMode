@@ -139,8 +139,22 @@ public final class SessionJournal{
 
     private static void line(String text){
         synchronized(pending){
-            pending.append('[').append(time.format(new Date())).append("] ").append(text.replace('\n', ' ')).append('\n');
+            pending.append('[').append(time.format(new Date())).append("] ").append(clean(text)).append('\n');
         }
+    }
+
+    /** One line, and without the control characters a nick could carry: the journal is read as plain text. */
+    private static String clean(String text){
+        StringBuilder out = new StringBuilder(text.length());
+        for(int i = 0; i < text.length(); i++){
+            char c = text.charAt(i);
+            if(c == '\n' || c == '\r' || c == '\t'){
+                out.append(' ');
+            }else if(c >= ' ' && c != '' && !(c >= '' && c <= '') && !(c >= '‪' && c <= '‮')){
+                out.append(c);
+            }
+        }
+        return out.toString();
     }
 
     public static synchronized void flush(){
