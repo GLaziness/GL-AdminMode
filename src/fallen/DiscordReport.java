@@ -5,20 +5,28 @@ import arc.struct.*;
 import arc.util.*;
 import mindustry.game.EventType.*;
 
+import javax.net.ssl.*;
 import java.io.*;
 import java.net.*;
 import java.nio.charset.*;
+import java.security.*;
+import java.security.cert.*;
 import java.text.*;
 import java.util.*;
 
 import static mindustry.Vars.*;
 
 /**
- * GL: sends every ban from the ban menu to a Discord channel through a webhook: an embed with the ban
- * and a text file with what the player did in the last minutes. Only bans on the servers from the list are sent.
+ * GL: sends every ban from the ban menu to a Discord channel: a card with the ban and a text file with what the player
+ * did in the last minutes. It goes through the gl-reports relay, which keeps the webhook, and every admin uses his own key.
+ * Only bans on the servers from the list are sent.
  */
 public final class DiscordReport{
     public static final String defaultServers = "80.66.89.54";
+    /** The relay (gl-reports on the GL server) and the SHA-256 of its certificate. */
+    private static final String relayHost = "2.26.10.69";
+    private static final int relayPort = 7161;
+    private static final String relayPin = "a64e71432b57370ae1fb63ac82d5e94f883caf823b537248b088fb184f641851";
     private static final int color = 0xE0453A, testColor = 0x7FD3FF;
 
     /** Address of the server the client is connected to, resolved to an IP. */
@@ -46,12 +54,13 @@ public final class DiscordReport{
         return Core.settings.getBool("sam-discord", true);
     }
 
-    public static String webhook(){
-        return Core.settings.getString("sam-discord-webhook", "").trim();
+    /** The admin's own key for the relay, given by the owner of the relay. */
+    public static String key(){
+        return Core.settings.getString("sam-discord-key", "").trim();
     }
 
-    public static boolean validWebhook(String url){
-        return url.matches("https://(ptb\\.|canary\\.)?discord(app)?\\.com/api/webhooks/\\d+/[\\w-]+");
+    public static boolean validKey(String key){
+        return key.matches("glr_[A-Za-z0-9_-]{20,64}");
     }
 
     /** Whether bans on the current server go to Discord. */
@@ -68,7 +77,7 @@ public final class DiscordReport{
      * @param reasonText rule text or the custom reason, shown in the embed
      */
     public static void ban(PlayerData data, int playerId, String name, String uuid, String length, String reason, String reasonText, String scope, boolean auto){
-        if(!enabled() || !validWebhook(webhook()) || !allowedServer()) return;
+        if(!enabled() || !validKey(key()) || !allowedServer()) return;
 
         long now = System.currentTimeMillis();
         String nick = clean(name);
@@ -110,16 +119,14 @@ public final class DiscordReport{
         String embed = "{\"title\":" + json("🔨 " + Core.bundle.format("sam.discord.title", nick))
             + ",\"color\":" + color
             + ",\"fields\":[" + fields + "]"
-            + ",\"footer\":{\"text\":" + json("GL Admin Mode · " + serverIp + ":" + serverPort) + "}"
             + ",\"timestamp\":" + json(iso(now)) + "}";
-        send(webhook(), embed, fileName, text, false);
+        send(embed, fileName, text, false);
     }
 
     /** A sample report, sent from the settings on any server. */
     public static void test(){
-        String url = webhook();
-        if(!validWebhook(url)){
-            ui.showInfoFade(Core.bundle.get("sam.discord.badUrl"));
+        if(!validKey(key())){
+            ui.showInfoFade(Core.bundle.get("sam.discord.badKey"));
             return;
         }
         StringBuilder fields = new StringBuilder();
@@ -128,70 +135,78 @@ public final class DiscordReport{
         String embed = "{\"title\":" + json("✅ " + Core.bundle.get("sam.discord.testTitle"))
             + ",\"description\":" + json(Core.bundle.get("sam.discord.testText"))
             + ",\"color\":" + testColor + ",\"fields\":[" + fields + "]"
-            + ",\"footer\":{\"text\":\"GL Admin Mode\"},\"timestamp\":" + json(iso(System.currentTimeMillis())) + "}";
-        send(url, embed, null, null, true);
+            + ",\"timestamp\":" + json(iso(System.currentTimeMillis())) + "}";
+        send(embed, null, null, true);
     }
 
-    /** Posts the embed (and the file) as multipart/form-data on a background thread. */
-    private static void send(String url, String embed, String fileName, String fileText, boolean notifySuccess){
-        String payload = "{\"username\":\"GL Admin Mode\",\"allowed_mentions\":{\"parse\":[]},\"embeds\":[" + embed + "]"
-            + (fileName != null ? ",\"attachments\":[{\"id\":0,\"filename\":" + json(fileName) + "}]" : "") + "}";
+    /**
+     * Sends the report to the relay on the GL server, which posts it to Discord: the webhook link is kept there
+     * and never reaches the players. The relay certificate is pinned, like the GL Client chat does.
+     */
+    private static void send(String embed, String fileName, String fileText, boolean test){
+        String body = "{\"server\":" + json(serverIp + ":" + serverPort) + ",\"test\":" + test + ",\"embed\":" + embed
+            + (fileName != null ? ",\"file_name\":" + json(fileName) + ",\"file\":" + json(fileText) : "") + "}";
+        String key = key();
 
-        Threads.daemon("gl-admin-discord", () -> {
+        Threads.daemon("gl-admin-report", () -> {
+            String code;
             try{
-                String boundary = "----gladmin" + Long.toHexString(System.nanoTime());
-                ByteArrayOutputStream body = new ByteArrayOutputStream();
-                part(body, boundary, "payload_json", null, "application/json", payload.getBytes(StandardCharsets.UTF_8));
-                if(fileName != null){
-                    part(body, boundary, "files[0]", fileName, "text/plain; charset=utf-8", fileText.getBytes(StandardCharsets.UTF_8));
-                }
-                body.write(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
-
-                HttpURLConnection con = (HttpURLConnection)new URL(url + "?wait=true").openConnection();
-                con.setRequestMethod("POST");
-                con.setDoOutput(true);
-                con.setConnectTimeout(10000);
-                con.setReadTimeout(15000);
-                con.setRequestProperty("User-Agent", "GL-AdminMode");
-                con.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + boundary);
-                try(OutputStream out = con.getOutputStream()){
-                    body.writeTo(out);
-                }
-                int code = con.getResponseCode();
-                if(code >= 200 && code < 300){
-                    if(notifySuccess) Core.app.post(() -> ui.showInfoFade(Core.bundle.get("sam.discord.sent")));
-                    else Core.app.post(() -> ui.showInfoFade(Core.bundle.get("sam.discord.banSent")));
-                }else{
-                    String error = "";
-                    try(InputStream in = con.getErrorStream()){
-                        if(in != null) error = new String(readAll(in), StandardCharsets.UTF_8);
+                byte[] data = body.getBytes(StandardCharsets.UTF_8);
+                SSLContext ctx = SSLContext.getInstance("TLS");
+                ctx.init(null, new TrustManager[]{new PinnedTrust()}, new SecureRandom());
+                try(Socket raw = new Socket()){
+                    raw.connect(new InetSocketAddress(relayHost, relayPort), 10000);
+                    raw.setSoTimeout(30000);
+                    try(SSLSocket socket = (SSLSocket)ctx.getSocketFactory().createSocket(raw, relayHost, relayPort, true)){
+                        socket.startHandshake();
+                        OutputStream out = socket.getOutputStream();
+                        out.write(("{\"t\":\"report\",\"v\":1,\"key\":" + json(key) + ",\"size\":" + data.length + "}\n").getBytes(StandardCharsets.UTF_8));
+                        out.write(data);
+                        out.flush();
+                        String answer = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8)).readLine();
+                        java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"code\":\\s*\"(\\w+)\"").matcher(answer == null ? "" : answer);
+                        code = answer != null && answer.matches(".*\"ok\":\\s*true.*") ? null : m.find() ? m.group(1) : "noanswer";
                     }
-                    Log.err("[GL Admin] Discord webhook: @ @", code, error);
-                    int c = code;
-                    Core.app.post(() -> ui.showInfoFade(Core.bundle.format("sam.discord.failed", c)));
                 }
-                con.disconnect();
             }catch(Throwable t){
-                Log.err("[GL Admin] Discord webhook", t);
-                Core.app.post(() -> ui.showInfoFade(Core.bundle.format("sam.discord.failed", t.getClass().getSimpleName())));
+                Log.err("[GL Admin] ban report", t);
+                code = "connect";
             }
+            String result = code;
+            Core.app.post(() -> {
+                if(result == null) ui.showInfoFade(Core.bundle.get(test ? "sam.discord.sent" : "sam.discord.banSent"));
+                else ui.showInfoFade(Core.bundle.format("sam.discord.failed", Core.bundle.get("sam.discord.error." + result, result)));
+            });
         });
     }
 
-    private static void part(ByteArrayOutputStream body, String boundary, String name, String fileName, String type, byte[] data) throws IOException{
-        String head = "--" + boundary + "\r\nContent-Disposition: form-data; name=\"" + name + "\""
-            + (fileName != null ? "; filename=\"" + fileName.replace("\"", "_") + "\"" : "")
-            + "\r\nContent-Type: " + type + "\r\n\r\n";
-        body.write(head.getBytes(StandardCharsets.UTF_8));
-        body.write(data);
-        body.write("\r\n".getBytes(StandardCharsets.UTF_8));
+    private static String hex(byte[] bytes){
+        StringBuilder sb = new StringBuilder();
+        for(byte b : bytes) sb.append(String.format("%02x", b));
+        return sb.toString();
     }
 
-    private static byte[] readAll(InputStream in) throws IOException{
-        ByteArrayOutputStream out = new ByteArrayOutputStream();
-        byte[] buf = new byte[4096];
-        for(int n; (n = in.read(buf)) > 0; ) out.write(buf, 0, n);
-        return out.toByteArray();
+    private static class PinnedTrust implements X509TrustManager{
+        @Override
+        public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException{
+            throw new CertificateException("no client certificates");
+        }
+
+        @Override
+        public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException{
+            try{
+                if(chain == null || chain.length == 0 || !hex(MessageDigest.getInstance("SHA-256").digest(chain[0].getEncoded())).equals(relayPin)){
+                    throw new CertificateException("certificate pin mismatch");
+                }
+            }catch(NoSuchAlgorithmException e){
+                throw new CertificateException(e);
+            }
+        }
+
+        @Override
+        public X509Certificate[] getAcceptedIssuers(){
+            return new X509Certificate[0];
+        }
     }
 
     /** Unix time in milliseconds when the ban ends, -1 for a permanent one. Same units as /ban: a bare number is minutes. */
